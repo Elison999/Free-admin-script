@@ -52,7 +52,6 @@ local commandCategories = {
         {name = "Mute Todos", cmd = ":mute", chat = "/e :mute all"},
         {name = "Unmute Todos", cmd = ":unmute", chat = "/e :unmute all"},
         {name = "Dog Todos", cmd = ":dog", chat = "/e :dog all"}
-        {name = "smite todos", cmd = ":smite", chat = "/e :smite all"},
     }
 }
 
