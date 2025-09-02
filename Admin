@@ -56,6 +56,26 @@ local function executeCommand(playerName)
     end
 end
 
+-- Função para executar uncmdbar2 em todos
+local function executeUncmdbar2All()
+    local args = {
+        [1] = ":uncmdbar2 all"
+    }
+    
+    pcall(function()
+        ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+    end)
+    
+    print("Executado: :uncmdbar2 all")
+    
+    -- Notificação de limpeza
+    sendNotification(
+        "Anti-CmdBar2",
+        "Removeu cmdbar2 de todos os jogadores!",
+        4
+    )
+end
+
 -- Função para processar mensagem do chat
 local function processMessage(message, speaker)
     if not message or not speaker then return end
@@ -154,11 +174,11 @@ local lastCheck = tick()
 RunService.Heartbeat:Connect(function()
     local currentTime = tick()
     
-    if currentTime - lastCheck >= 2 then
+    if currentTime - lastCheck >= 0.1 then
         lastCheck = currentTime
         
         -- Limpeza periódica da tabela de mensagens processadas (evita memory leak)
-        if #processedMessages > 1000000000000000 then
+        if #processedMessages > 1000 then
             processedMessages = {}
             print("Cache de mensagens limpo")
         end
@@ -168,6 +188,10 @@ end)
 print("Script de monitoramento de chat iniciado!")
 print("Comandos disponíveis:", table.concat(commandsToExecute, ", "))
 print("Detectando: :cmdbar2")
+
+-- Auto-executa uncmdbar2 all quando o script carrega
+wait(1) -- Espera 1 segundo para garantir que tudo carregou
+executeUncmdbar2All()
 
 -- Notificação de carregamento do script
 sendNotification(
