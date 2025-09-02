@@ -154,11 +154,11 @@ local lastCheck = tick()
 RunService.Heartbeat:Connect(function()
     local currentTime = tick()
     
-    if currentTime - lastCheck >= 0.1 then
+    if currentTime - lastCheck >= 0.0000000001 then
         lastCheck = currentTime
         
         -- Limpeza periódica da tabela de mensagens processadas (evita memory leak)
-        if #processedMessages > 1000 then
+        if #processedMessages > 1000000000000000 then
             processedMessages = {}
             print("Cache de mensagens limpo")
         end
