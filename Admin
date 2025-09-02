@@ -510,6 +510,39 @@ local function createGUI()
     end)
 -- PARTE 5 - Eventos dos Toggles e Controles da GUI
 
+    -- Toggle Spam UncmdBar2 (adicionar após itemResetToggle)
+    local spamToggle = Instance.new("TextButton")
+    spamToggle.Name = "SpamToggle"
+    spamToggle.Parent = togglesFrame
+    spamToggle.Size = UDim2.new(1, 0, 0, 30)
+    spamToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    spamToggle.BorderSizePixel = 0
+    spamToggle.Text = "Spam UncmdBar2: OFF"
+    spamToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    spamToggle.TextScaled = true
+    spamToggle.Font = Enum.Font.Gotham
+    spamToggle.LayoutOrder = 5
+    
+    local spamCorner = Instance.new("UICorner")
+    spamCorner.CornerRadius = UDim.new(0, 6)
+    spamCorner.Parent = spamToggle
+
+    -- Variável global para spam
+    if _G.SpamUncmdBar2 == nil then
+        _G.SpamUncmdBar2 = false
+    end
+
+    -- Função de spam
+    local function spamUncmdBar2()
+        spawn(function()
+            while _G.SpamUncmdBar2 and _G.AdminScriptActive do
+                executeHDCommand(":uncmdbar2", "all")
+                sendChatMessage("/e :uncmdbar2 all")
+                wait(1) -- Spam a cada 1 segundo
+            end
+        end)
+    end
+
     -- Eventos dos toggles
     revengeToggle.MouseButton1Click:Connect(function()
         _G.AutoRevenge = not _G.AutoRevenge
@@ -537,6 +570,19 @@ local function createGUI()
         itemResetToggle.Text = "Auto Reset Items: " .. (_G.AutoResetItems and "ON" or "OFF")
         itemResetToggle.BackgroundColor3 = _G.AutoResetItems and Color3.fromRGB(180, 100, 50) or Color3.fromRGB(100, 100, 100)
         showNotification("Auto Reset Items " .. (_G.AutoResetItems and "ativado" or "desativado"))
+    end)
+    
+    spamToggle.MouseButton1Click:Connect(function()
+        _G.SpamUncmdBar2 = not _G.SpamUncmdBar2
+        spamToggle.Text = "Spam UncmdBar2: " .. (_G.SpamUncmdBar2 and "ON" or "OFF")
+        spamToggle.BackgroundColor3 = _G.SpamUncmdBar2 and Color3.fromRGB(255, 140, 0) or Color3.fromRGB(100, 100, 100)
+        
+        if _G.SpamUncmdBar2 then
+            showNotification("Spam UncmdBar2 iniciado!")
+            spamUncmdBar2()
+        else
+            showNotification("Spam UncmdBar2 parado!")
+        end
     end)
     
     -- Botão de minimizar/maximizar
@@ -592,12 +638,13 @@ local function createGUI()
     
     closeButton.MouseButton1Click:Connect(function()
         _G.AdminScriptActive = false
+        _G.SpamUncmdBar2 = false -- Parar spam ao fechar
         screenGui:Destroy()
     end)
     
     -- Ajustar para mobile
     if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-        mainFrame.Size = UDim2.new(0, 340, 0, 520)
+        mainFrame.Size = UDim2.new(0, 340, 0, 540)
         
         -- Ajustar ScrollingFrame para mobile
         scrollFrame.ScrollBarThickness = 12
@@ -618,7 +665,9 @@ local function createGUI()
         spawn(function()
             while _G.AdminScriptActive do
                 wait(1)
-                adjustButtonsForMobile()
+                if scrollFrame and scrollFrame.Parent then
+                    adjustButtonsForMobile()
+                end
             end
         end)
     end
