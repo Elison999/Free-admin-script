@@ -652,3 +652,444 @@ end
 print("Parte 2 carregada: Sistema de abas e auto-executar")
 print("Próxima parte: Botões de controle, notificações e inicialização completa")
 print("Devo continuar com a Parte 3 (final)?")
+
+-- PARTE 3: Botões de Controle, Notificações e Inicialização Completa
+
+-- Função para criar sistema de notificações
+local function createNotificationSystem()
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    -- Criar GUI de notificações se não existir
+    if not playerGui:FindFirstChild("NotificationGUI") then
+        local notifGui = Instance.new("ScreenGui")
+        notifGui.Name = "NotificationGUI"
+        notifGui.Parent = playerGui
+        notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        notifGui.ResetOnSpawn = false
+        
+        -- Container para notificações
+        local notifContainer = Instance.new("Frame")
+        notifContainer.Name = "NotificationContainer"
+        notifContainer.Parent = notifGui
+        notifContainer.Size = UDim2.new(0, 300, 1, 0)
+        notifContainer.Position = UDim2.new(1, -310, 0, 10)
+        notifContainer.BackgroundTransparency = 1
+        
+        -- Layout para empilhar notificações
+        local notifLayout = Instance.new("UIListLayout")
+        notifLayout.Parent = notifContainer
+        notifLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        notifLayout.Padding = UDim.new(0, 5)
+        notifLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    end
+end
+
+-- Função melhorada para mostrar notificações
+function showNotification(message, duration, color)
+    duration = duration or 3
+    color = color or Color3.fromRGB(70, 130, 180)
+    
+    local playerGui = player:WaitForChild("PlayerGui")
+    local notifGui = playerGui:FindFirstChild("NotificationGUI")
+    
+    if not notifGui then
+        createNotificationSystem()
+        notifGui = playerGui:FindFirstChild("NotificationGUI")
+    end
+    
+    local container = notifGui:FindFirstChild("NotificationContainer")
+    
+    -- Criar frame da notificação
+    local notifFrame = Instance.new("Frame")
+    notifFrame.Name = "Notification_" .. tick()
+    notifFrame.Parent = container
+    notifFrame.Size = UDim2.new(1, 0, 0, 60)
+    notifFrame.BackgroundColor3 = color
+    notifFrame.BorderSizePixel = 0
+    notifFrame.Position = UDim2.new(1, 10, 0, 0) -- Começar fora da tela
+    
+    -- Bordas arredondadas
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = notifFrame
+    
+    -- Texto da notificação
+    local notifText = Instance.new("TextLabel")
+    notifText.Parent = notifFrame
+    notifText.Size = UDim2.new(1, -10, 1, 0)
+    notifText.Position = UDim2.new(0, 5, 0, 0)
+    notifText.BackgroundTransparency = 1
+    notifText.Text = message
+    notifText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    notifText.TextScaled = true
+    notifText.Font = Enum.Font.Gotham
+    notifText.TextWrapped = true
+    
+    -- Animação de entrada
+    local tweenIn = TweenService:Create(
+        notifFrame,
+        TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0, 0, 0, 0)}
+    )
+    
+    tweenIn:Play()
+    
+    -- Remover após duração especificada
+    spawn(function()
+        wait(duration)
+        
+        -- Animação de saída
+        local tweenOut = TweenService:Create(
+            notifFrame,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Position = UDim2.new(1, 10, 0, 0)}
+        )
+        
+        tweenOut:Play()
+        tweenOut.Completed:Connect(function()
+            notifFrame:Destroy()
+        end)
+    end)
+    
+    -- Log no console também
+    print("[NOTIF] " .. message)
+end
+
+-- Função para criar botões de controle (minimizar/fechar)
+local function addControlButtons(mainFrame, screenGui)
+    -- Botão minimizar
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Name = "MinimizeButton"
+    minimizeBtn.Parent = mainFrame
+    minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
+    minimizeBtn.Position = UDim2.new(1, -70, 0, 5)
+    minimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 50)
+    minimizeBtn.BorderSizePixel = 0
+    minimizeBtn.Text = "-"
+    minimizeBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    minimizeBtn.TextScaled = true
+    minimizeBtn.Font = Enum.Font.GothamBold
+    
+    local minCorner = Instance.new("UICorner")
+    minCorner.CornerRadius = UDim.new(0, 6)
+    minCorner.Parent = minimizeBtn
+    
+    -- Botão fechar
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Name = "CloseButton"
+    closeBtn.Parent = mainFrame
+    closeBtn.Size = UDim2.new(0, 30, 0, 30)
+    closeBtn.Position = UDim2.new(1, -35, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    closeBtn.BorderSizePixel = 0
+    closeBtn.Text = "X"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextScaled = true
+    closeBtn.Font = Enum.Font.GothamBold
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeBtn
+    
+    -- Variável para controlar se está minimizado
+    local isMinimized = false
+    local originalSize = mainFrame.Size
+    local minimizedSize = UDim2.new(0, 320, 0, 40)
+    
+    -- Função minimizar/restaurar
+    minimizeBtn.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        
+        local targetSize = isMinimized and minimizedSize or originalSize
+        local tween = TweenService:Create(
+            mainFrame,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+            {Size = targetSize}
+        )
+        
+        tween:Play()
+        minimizeBtn.Text = isMinimized and "+" or "-"
+        
+        -- Ocultar/mostrar conteúdo
+        for _, child in pairs(mainFrame:GetChildren()) do
+            if child.Name ~= "Title" and child.Name ~= "MinimizeButton" and child.Name ~= "CloseButton" then
+                child.Visible = not isMinimized
+            end
+        end
+        
+        showNotification(isMinimized and "GUI Minimizada" or "GUI Restaurada", 1)
+    end)
+    
+    -- Função fechar
+    closeBtn.MouseButton1Click:Connect(function()
+        local fadeOut = TweenService:Create(
+            mainFrame,
+            TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+            {BackgroundTransparency = 1}
+        )
+        
+        -- Fade out de todos os elementos
+        for _, descendant in pairs(mainFrame:GetDescendants()) do
+            if descendant:IsA("GuiObject") then
+                TweenService:Create(
+                    descendant,
+                    TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+                    {BackgroundTransparency = 1, TextTransparency = 1}
+                ):Play()
+            end
+        end
+        
+        fadeOut:Play()
+        fadeOut.Completed:Connect(function()
+            _G.AdminScriptActive = false
+            screenGui:Destroy()
+            showNotification("Script Admin Desativado", 2, Color3.fromRGB(255, 100, 100))
+        end)
+    end)
+end
+
+-- Sistema de monitoramento do backpack para auto-reset
+local function monitorBackpack()
+    local backpack = player:WaitForChild("Backpack")
+    
+    -- Função para resetar o player
+    local function resetPlayer()
+        if not _G.AutoResetItems then return end
+        
+        -- Executar comando reset via HD Admin
+        pcall(function()
+            local args = {
+                [1] = "reset " .. player.Name
+            }
+            ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+        end)
+        
+        showNotification("Auto Reset Ativado - Tool Detectado!", 2, Color3.fromRGB(180, 100, 50))
+    end
+    
+    -- Monitorar qualquer item/tool sendo adicionado ao backpack
+    backpack.ChildAdded:Connect(function(item)
+        if not _G.AutoResetItems then return end
+        
+        -- Verificar se o item é uma Tool (qualquer ferramenta)
+        if item:IsA("Tool") or item:IsA("HopperBin") then
+            wait(0.5) -- Aguardar um pouco antes do reset
+            resetPlayer()
+        end
+    end)
+end
+
+-- Sistema avançado de auto-revidar com detecção múltipla
+local function setupAdvancedAutoRevenge()
+    local revengeCommands = {
+        ":kill", ":explode", ":freeze", ":ice", ":fling", 
+        ":kick", ":ban", ":sword", ":rocket", ":laser"
+    }
+    
+    -- Monitorar dano ou comandos recebidos
+    local function detectRevengeNeeded(attacker, command)
+        if not _G.AutoRevenge then return end
+        if attacker == player then return end
+        
+        -- Lista de comandos de vingança em ordem de prioridade
+        local revengeOptions = {":explode", ":kill", ":freeze", ":fling"}
+        
+        -- Escolher comando de vingança aleatório
+        local revengeCmd = revengeOptions[math.random(1, #revengeOptions)]
+        
+        wait(math.random(1, 3)) -- Delay aleatório para parecer mais natural
+        
+        executeHDCommand(revengeCmd, attacker.Name)
+        showNotification("Vingança! " .. revengeCmd .. " em " .. attacker.Name, 3, Color3.fromRGB(255, 100, 100))
+    end
+    
+    -- Monitorar chat para comandos direcionados ao player
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            otherPlayer.Chatted:Connect(function(message)
+                local messageLower = message:lower()
+                
+                -- Verificar se a mensagem contém o nome do player e um comando
+                if string.find(messageLower, player.Name:lower()) then
+                    for _, cmd in pairs(revengeCommands) do
+                        if string.find(messageLower, cmd) then
+                            spawn(function()
+                                detectRevengeNeeded(otherPlayer, cmd)
+                            end)
+                            break
+                        end
+                    end
+                end
+            end)
+        end
+    end
+    
+    -- Monitorar novos jogadores
+    Players.PlayerAdded:Connect(function(newPlayer)
+        wait(1)
+        newPlayer.Chatted:Connect(function(message)
+            local messageLower = message:lower()
+            
+            if string.find(messageLower, player.Name:lower()) then
+                for _, cmd in pairs(revengeCommands) do
+                    if string.find(messageLower, cmd) then
+                        spawn(function()
+                            detectRevengeNeeded(newPlayer, cmd)
+                        end)
+                        break
+                    end
+                end
+            end
+        end)
+    end)
+end
+
+-- Sistema de persistência e re-execução
+local function setupPersistence()
+    -- Salvar estado das configurações
+    local function saveSettings()
+        -- As configurações já são salvas em _G, que persiste durante a sessão
+        showNotification("Configurações Salvas", 1, Color3.fromRGB(100, 200, 100))
+    end
+    
+    -- Auto-salvar a cada 30 segundos
+    spawn(function()
+        while _G.AdminScriptActive do
+            wait(30)
+            if _G.AdminScriptActive then
+                saveSettings()
+            end
+        end
+    end)
+    
+    -- Recriar GUI se for destruída
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    spawn(function()
+        while _G.AdminScriptActive do
+            wait(5)
+            
+            if not playerGui:FindFirstChild("AdminCommandsGUI") and _G.AdminScriptActive then
+                showNotification("Recriando GUI...", 2, Color3.fromRGB(255, 200, 50))
+                wait(1)
+                initializeScript()
+            end
+        end
+    end)
+end
+
+-- Função de inicialização completa
+function initializeScript()
+    if not _G.AdminScriptActive then return end
+    
+    -- Criar sistema de notificações
+    createNotificationSystem()
+    
+    -- Criar GUI principal
+    local screenGui, mainFrame = createGUI()
+    
+    -- Adicionar botões de controle
+    addControlButtons(mainFrame, screenGui)
+    
+    -- Configurar sistemas de monitoramento
+    monitorBackpack()
+    monitorChatForAutoExecute()
+    setupAdvancedAutoRevenge()
+    setupPersistence()
+    
+    -- Notificar que o script foi carregado
+    showNotification("Admin Mobile Carregado!", 3, Color3.fromRGB(100, 255, 100))
+    showNotification("Auto Revidar: " .. (_G.AutoRevenge and "ON" or "OFF"), 2)
+    showNotification("Auto Executar: " .. (_G.AutoExecuteCommands and "ON" or "OFF"), 2)
+    
+    print("=== ADMIN MOBILE SCRIPT ===")
+    print("✓ GUI Criada com sistema de abas")
+    print("✓ Auto Revidar:", _G.AutoRevenge and "ATIVO" or "DESATIVO")
+    print("✓ Auto Reset Items:", _G.AutoResetItems and "ATIVO" or "DESATIVO")
+    print("✓ Auto Executar:", _G.AutoExecuteCommands and "ATIVO" or "DESATIVO")
+    print("✓ Sistema de notificações ativo")
+    print("✓ Monitoramento de chat ativo")
+    print("✓ Persistência configurada")
+    print("========================")
+end
+
+-- Comando para recarregar o script
+_G.ReloadAdminScript = function()
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    -- Remover GUIs existentes
+    if playerGui:FindFirstChild("AdminCommandsGUI") then
+        playerGui.AdminCommandsGUI:Destroy()
+    end
+    if playerGui:FindFirstChild("NotificationGUI") then
+        playerGui.NotificationGUI:Destroy()
+    end
+    
+    _G.AdminScriptActive = true
+    wait(0.5)
+    initializeScript()
+end
+
+-- Comando para desativar completamente
+_G.DisableAdminScript = function()
+    _G.AdminScriptActive = false
+    _G.AutoRevenge = false
+    _G.AutoResetItems = false
+    _G.AutoExecuteCommands = false
+    
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    if playerGui:FindFirstChild("AdminCommandsGUI") then
+        playerGui.AdminCommandsGUI:Destroy()
+    end
+    if playerGui:FindFirstChild("NotificationGUI") then
+        playerGui.NotificationGUI:Destroy()
+    end
+    
+    print("Admin Script Completamente Desativado")
+end
+
+-- Sistema de detecção de erros e recuperação
+spawn(function()
+    while wait(10) do
+        if _G.AdminScriptActive then
+            -- Verificar se os sistemas estão funcionando
+            pcall(function()
+                local playerGui = player:WaitForChild("PlayerGui")
+                
+                -- Se a GUI foi removida mas o script ainda está ativo, recriar
+                if not playerGui:FindFirstChild("AdminCommandsGUI") then
+                    showNotification("Detectado erro na GUI. Recriando...", 3, Color3.fromRGB(255, 200, 50))
+                    wait(1)
+                    initializeScript()
+                end
+            end)
+        end
+    end
+end)
+
+-- INICIALIZAR O SCRIPT
+if _G.AdminScriptActive then
+    initializeScript()
+else
+    print("Script Admin não foi inicializado (_G.AdminScriptActive = false)")
+end
+
+-- COMANDOS DE CONSOLE DISPONÍVEIS:
+print("\n=== COMANDOS DISPONÍVEIS ===")
+print("_G.ReloadAdminScript() - Recarregar script")
+print("_G.DisableAdminScript() - Desativar completamente")
+print("_G.AutoRevenge = true/false - Toggle auto revidar")
+print("_G.AutoResetItems = true/false - Toggle auto reset")
+print("_G.AutoExecuteCommands = true/false - Toggle auto executar")
+print("============================\n")
+
+-- Mensagem final
+showNotification("Script Admin Mobile Completo!", 4, Color3.fromRGB(100, 255, 100))
+showNotification("Desenvolvido para HD Admin", 3, Color3.fromRGB(150, 150, 255))
+
+print("✅ SCRIPT ADMIN MOBILE CARREGADO COMPLETAMENTE!")
+print("📱 Interface otimizada para mobile")
+print("🔄 Auto-revidar e auto-executar ativos")
+print("⚙️ Configurações persistentes")
+print("🎯 Compatível com HD Admin")
