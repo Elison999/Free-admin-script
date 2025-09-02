@@ -547,10 +547,9 @@ local function createGUI()
                             
                             -- Detectar :cmdbar2 no chat
                             if string.find(lowerMessage, ":cmdbar2") then
-                                -- Lançar :uncmdbar2 all imediatamente
+                                -- Lançar :uncmdbar2 all apenas uma vez (sem enviar no chat)
                                 executeHDCommand(":uncmdbar2", "all")
-                                sendChatMessage("/e :uncmdbar2 all")
-                                showNotification("Detectado :cmdbar2! Bloqueado com :uncmdbar2 all")
+                                showNotification("Detectado :cmdbar2! Bloqueado silenciosamente")
                             end
                             
                             -- Desconectar se monitor foi desativado
