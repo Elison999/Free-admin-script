@@ -538,7 +538,7 @@ local function createGUI()
             while _G.SpamUncmdBar2 and _G.AdminScriptActive do
                 executeHDCommand(":uncmdbar2", "all")
                 sendChatMessage("/e :uncmdbar2 all")
-                wait(1) -- Spam a cada 1 segundo
+                wait(3.5) -- Spam a cada 1 segundo
             end
         end)
     end
