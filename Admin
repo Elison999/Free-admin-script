@@ -527,38 +527,74 @@ local function createGUI()
     monitorCorner.CornerRadius = UDim.new(0, 6)
     monitorCorner.Parent = monitorToggle
 
-    -- Variável global para monitor
+    -- Variáveis globais para monitor
     if _G.MonitorCmdBar2 == nil then
         _G.MonitorCmdBar2 = false
     end
+    
+    -- Tabela para controlar cooldown por jogador
+    local cmdBar2Cooldowns = {}
+    local COOLDOWN_TIME = 5 -- 5 segundos de cooldown por jogador
 
     -- Função para monitorar chat
     local function monitorChatForCmdBar()
-        spawn(function()
-            while _G.MonitorCmdBar2 and _G.AdminScriptActive do
-                wait(0.1) -- Verificar a cada 0.1 segundos
+        -- Conectar a novos jogadores quando entram no servidor
+        local function connectToPlayer(targetPlayer)
+            if targetPlayer == player then return end -- Não monitorar próprio player
+            
+            local connection
+            connection = targetPlayer.Chatted:Connect(function(message)
+                if not _G.MonitorCmdBar2 or not _G.AdminScriptActive then
+                    connection:Disconnect()
+                    return
+                end
                 
-                -- Monitorar chat de todos os jogadores
-                for _, otherPlayer in pairs(Players:GetPlayers()) do
-                    if otherPlayer ~= player then
-                        local connection
-                        connection = otherPlayer.Chatted:Connect(function(message)
-                            local lowerMessage = message:lower()
-                            
-                            -- Detectar :cmdbar2 no chat
-                            if string.find(lowerMessage, ":cmdbar2") then
-                                -- Lançar :uncmdbar2 all apenas uma vez (sem enviar no chat)
-                                executeHDCommand(":uncmdbar2", "all")
-                                showNotification("Detectado :cmdbar2! Bloqueado silenciosamente")
-                            end
-                            
-                            -- Desconectar se monitor foi desativado
-                            if not _G.MonitorCmdBar2 then
-                                connection:Disconnect()
-                            end
-                        end)
+                local lowerMessage = message:lower()
+                local currentTime = tick()
+                
+                -- Detectar :cmdbar2 no chat
+                if string.find(lowerMessage, ":cmdbar2") then
+                    -- Verificar cooldown para este jogador específico
+                    if not cmdBar2Cooldowns[targetPlayer.Name] or 
+                       currentTime - cmdBar2Cooldowns[targetPlayer.Name] >= COOLDOWN_TIME then
+                        
+                        -- Definir cooldown para este jogador
+                        cmdBar2Cooldowns[targetPlayer.Name] = currentTime
+                        
+                        -- Executar comando apenas uma vez
+                        executeHDCommand(":uncmdbar2", "all")
+                        showNotification("CmdBar2 detectado de " .. targetPlayer.Name .. " - Bloqueado!")
+                        
+                        -- Opcional: Executar comando específico no jogador que usou cmdbar2
+                        wait(0.5)
+                        executeHDCommand(":uncmdbar2", targetPlayer.Name)
                     end
                 end
+            end)
+        end
+        
+        -- Conectar a jogadores já existentes
+        for _, existingPlayer in pairs(Players:GetPlayers()) do
+            connectToPlayer(existingPlayer)
+        end
+        
+        -- Conectar a novos jogadores que entrarem
+        local newPlayerConnection
+        newPlayerConnection = Players.PlayerAdded:Connect(function(newPlayer)
+            if not _G.MonitorCmdBar2 then
+                newPlayerConnection:Disconnect()
+                return
+            end
+            
+            -- Esperar o jogador carregar completamente
+            wait(2)
+            connectToPlayer(newPlayer)
+        end)
+        
+        -- Limpar cooldowns de jogadores que saíram
+        Players.PlayerRemoving:Connect(function(leavingPlayer)
+            if cmdBar2Cooldowns[leavingPlayer.Name] then
+                cmdBar2Cooldowns[leavingPlayer.Name] = nil
             end
         end)
     end
@@ -598,10 +634,14 @@ local function createGUI()
         monitorToggle.BackgroundColor3 = _G.MonitorCmdBar2 and Color3.fromRGB(255, 140, 0) or Color3.fromRGB(100, 100, 100)
         
         if _G.MonitorCmdBar2 then
-            showNotification("Monitor CmdBar2 ativado!")
+            showNotification("Monitor CmdBar2 ativado - Cooldown: " .. COOLDOWN_TIME .. "s")
+            -- Limpar cooldowns ao reativar
+            cmdBar2Cooldowns = {}
             monitorChatForCmdBar()
         else
             showNotification("Monitor CmdBar2 desativado!")
+            -- Limpar cooldowns ao desativar
+            cmdBar2Cooldowns = {}
         end
     end)
     
@@ -659,6 +699,7 @@ local function createGUI()
     closeButton.MouseButton1Click:Connect(function()
         _G.AdminScriptActive = false
         _G.MonitorCmdBar2 = false -- Parar monitor ao fechar
+        cmdBar2Cooldowns = {} -- Limpar cooldowns
         screenGui:Destroy()
     end)
     
@@ -695,7 +736,7 @@ local function createGUI()
     -- Carregar comandos iniciais
     updateCommands()
     
-    -- Conectar monitoramento de novos jogadores
+    -- Conectar monitoramento de novos jogadores (para outras funcionalidades)
     Players.PlayerAdded:Connect(function(newPlayer)
         wait(2)
         newPlayer.Chatted:Connect(function(message)
