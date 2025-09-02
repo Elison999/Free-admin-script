@@ -127,7 +127,7 @@ end
 -- Função para reconectar ao chat de um jogador
 local function reconnectPlayerChat(player)
     spawn(function()
-        wait(0.5) -- Pequena espera para estabilizar
+        wait(0.001) -- Pequena espera para estabilizar
         connectToPlayerChat(player)
     end)
 end
@@ -174,7 +174,7 @@ local lastCheck = tick()
 RunService.Heartbeat:Connect(function()
     local currentTime = tick()
     
-    if currentTime - lastCheck >= 0.1 then
+    if currentTime - lastCheck >= 2 then
         lastCheck = currentTime
         
         -- Limpeza periódica da tabela de mensagens processadas (evita memory leak)
