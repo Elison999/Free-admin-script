@@ -1,0 +1,654 @@
+-- Script de Comandos Administrativos para Mobile
+-- Interface otimizada para toque com auto-revidar e persistência
+-- PARTE 1: Sistema de Abas e Auto-Executar
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+
+local player = Players.LocalPlayer
+
+-- Variáveis globais para persistência
+_G.AdminScriptActive = true
+_G.AutoRevenge = true
+_G.AutoExecuteCommands = true -- Nova variável global
+
+-- Lista de comandos disponíveis
+local commands = {
+    {name = "Explodir Todos", cmd = ":explode", chat = "/e :explode all"},
+    {name = "Trazer Todos", cmd = ":bring", chat = "/e :bring all"},
+    {name = "Congelar Todos", cmd = ":freeze", chat = "/e :freeze all"},
+    {name = "Gelo Todos", cmd = ":ice", chat = "/e :ice all"},
+    {name = "Gigante Todos", cmd = ":giant", chat = "/e :giant all"},
+    {name = "Anão Todos", cmd = ":dwarf", chat = "/e :dwarf all"},
+    {name = "Voar Todos", cmd = ":fly", chat = "/e :fly all"},
+    {name = "Velocidade Todos", cmd = ":speed", chat = "/e :speed all"},
+    {name = "Pular Alto Todos", cmd = ":jumppower", chat = "/e :jumppower all"},
+    {name = "Invisível Todos", cmd = ":invisible", chat = "/e :invisible all"},
+    {name = "Visível Todos", cmd = ":visible", chat = "/e :visible all"},
+    {name = "Matar Todos", cmd = ":kill", chat = "/e :kill all"},
+    {name = "Curar Todos", cmd = ":heal", chat = "/e :heal all"},
+    {name = "Descongelar Todos", cmd = ":thaw", chat = "/e :thaw all"},
+    {name = "Parar Voo Todos", cmd = ":unfly", chat = "/e :unfly all"}
+}
+
+-- Mapeamento de comandos opostos para auto-executar
+local oppositeCommands = {
+    [":freeze"] = ":thaw",
+    [":thaw"] = ":freeze",
+    [":kill"] = ":heal", 
+    [":heal"] = ":kill",
+    [":explode"] = ":heal",
+    [":bring"] = ":tp",
+    [":fly"] = ":unfly",
+    [":unfly"] = ":fly",
+    [":invisible"] = ":visible",
+    [":visible"] = ":invisible",
+    [":giant"] = ":dwarf",
+    [":dwarf"] = ":giant",
+    [":speed"] = ":removespeed",
+    [":jumppower"] = ":removejumppower",
+    [":ice"] = ":thaw"
+}
+
+-- Função para enviar mensagem no chat
+local function sendChatMessage(message)
+    pcall(function()
+        game:GetService("Chat"):Chat(player.Character.Head, message, Enum.ChatColor.White)
+    end)
+end
+
+-- Função para obter todos os jogadores
+local function getAllPlayers()
+    local playerNames = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            table.insert(playerNames, p.Name)
+        end
+    end
+    return playerNames
+end
+
+-- Função para executar comando via HD Admin
+local function executeHDCommand(command, targetPlayer)
+    local args = {
+        [1] = command .. " " .. targetPlayer
+    }
+    
+    pcall(function()
+        ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+    end)
+end
+
+-- Função para executar comando em todos
+local function executeCommandAll(commandData)
+    -- Enviar no chat primeiro
+    sendChatMessage(commandData.chat)
+    
+    -- Aguardar um pouco antes de executar
+    wait(0.5)
+    
+    local allPlayers = getAllPlayers()
+    
+    for _, playerName in pairs(allPlayers) do
+        executeHDCommand(commandData.cmd, playerName)
+        wait(0.1)
+    end
+end
+
+-- Função para detectar e auto-executar comandos opostos
+local function autoExecuteOpposite(commandUsed, executor)
+    if not _G.AutoExecuteCommands then return end
+    
+    local oppositeCmd = oppositeCommands[commandUsed]
+    if oppositeCmd then
+        wait(0.5) -- Aguardar um pouco antes de executar
+        executeHDCommand(oppositeCmd, executor)
+        showNotification("Auto-Executado: " .. oppositeCmd .. " em " .. executor)
+    end
+end
+
+-- Função para criar GUI com sistema de abas
+local function createGUI()
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    -- Remover GUI existente se houver
+    if playerGui:FindFirstChild("AdminCommandsGUI") then
+        playerGui.AdminCommandsGUI:Destroy()
+    end
+    
+    -- Criar GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AdminCommandsGUI"
+    screenGui.Parent = playerGui
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.ResetOnSpawn = false
+    
+    -- Frame principal
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Parent = screenGui
+    mainFrame.Size = UDim2.new(0, 320, 0, 500)
+    mainFrame.Position = UDim2.new(0, 20, 0, 20)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+    
+    -- Título
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Parent = mainFrame
+    titleLabel.Size = UDim2.new(1, 0, 0, 40)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "Admin Mobile + Auto Revidar"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextScaled = true
+    titleLabel.Font = Enum.Font.GothamBold
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 12)
+    titleCorner.Parent = titleLabel
+    
+    -- Frame para as abas
+    local tabFrame = Instance.new("Frame")
+    tabFrame.Name = "TabFrame"
+    tabFrame.Parent = mainFrame
+    tabFrame.Size = UDim2.new(1, -10, 0, 40)
+    tabFrame.Position = UDim2.new(0, 5, 0, 45)
+    tabFrame.BackgroundTransparency = 1
+    
+    -- Layout para as abas
+    local tabLayout = Instance.new("UIListLayout")
+    tabLayout.Parent = tabFrame
+    tabLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLayout.Padding = UDim.new(0, 5)
+    
+    -- Aba 1: Comandos
+    local tab1 = Instance.new("TextButton")
+    tab1.Name = "Tab1"
+    tab1.Parent = tabFrame
+    tab1.Size = UDim2.new(0.5, -2.5, 1, 0)
+    tab1.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+    tab1.BorderSizePixel = 0
+    tab1.Text = "Comandos"
+    tab1.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab1.TextScaled = true
+    tab1.Font = Enum.Font.Gotham
+    tab1.LayoutOrder = 1
+    
+    local tab1Corner = Instance.new("UICorner")
+    tab1Corner.CornerRadius = UDim.new(0, 8)
+    tab1Corner.Parent = tab1
+    
+    -- Aba 2: Configurações
+    local tab2 = Instance.new("TextButton")
+    tab2.Name = "Tab2"
+    tab2.Parent = tabFrame
+    tab2.Size = UDim2.new(0.5, -2.5, 1, 0)
+    tab2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    tab2.BorderSizePixel = 0
+    tab2.Text = "Config"
+    tab2.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab2.TextScaled = true
+    tab2.Font = Enum.Font.Gotham
+    tab2.LayoutOrder = 2
+    
+    local tab2Corner = Instance.new("UICorner")
+    tab2Corner.CornerRadius = UDim.new(0, 8)
+    tab2Corner.Parent = tab2
+    
+    -- Continua na próxima parte...
+    return mainFrame, screenGui, tab1, tab2
+end
+
+print("Parte 1 carregada: Sistema de abas criado")
+print("Próxima parte: Conteúdo das abas e sistema de auto-executar")
+print("Devo continuar com a Parte 2?")
+
+-- PARTE 2: Conteúdo das Abas e Sistema de Auto-Executar
+
+-- Função para criar conteúdo da aba de comandos
+local function createCommandsTab(parentFrame)
+    local commandsContent = Instance.new("Frame")
+    commandsContent.Name = "CommandsContent"
+    commandsContent.Parent = parentFrame
+    commandsContent.Size = UDim2.new(1, -20, 1, -135)
+    commandsContent.Position = UDim2.new(0, 10, 0, 95)
+    commandsContent.BackgroundTransparency = 1
+    commandsContent.Visible = true
+    
+    -- ScrollingFrame para os botões de comandos
+    local scrollFrame = Instance.new("ScrollingFrame")
+    scrollFrame.Name = "CommandsScrollFrame"
+    scrollFrame.Parent = commandsContent
+    scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    scrollFrame.Position = UDim2.new(0, 0, 0, 0)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 8
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    
+    -- Layout para os botões
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = scrollFrame
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 8)
+    
+    -- Criar botões para cada comando
+    for i, commandData in pairs(commands) do
+        local button = Instance.new("TextButton")
+        button.Name = "Command" .. i
+        button.Parent = scrollFrame
+        button.Size = UDim2.new(1, -10, 0, 60)
+        button.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+        button.BorderSizePixel = 0
+        button.Text = commandData.name
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.TextScaled = true
+        button.Font = Enum.Font.Gotham
+        button.LayoutOrder = i
+        
+        -- Bordas arredondadas do botão
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(0, 8)
+        buttonCorner.Parent = button
+        
+        -- Efeito de hover/toque
+        local originalColor = Color3.fromRGB(70, 130, 180)
+        local hoverColor = Color3.fromRGB(90, 150, 200)
+        local pressedColor = Color3.fromRGB(50, 110, 160)
+        
+        button.MouseEnter:Connect(function()
+            if not UserInputService.TouchEnabled then
+                button.BackgroundColor3 = hoverColor
+            end
+        end)
+        
+        button.MouseLeave:Connect(function()
+            if not UserInputService.TouchEnabled then
+                button.BackgroundColor3 = originalColor
+            end
+        end)
+        
+        button.MouseButton1Down:Connect(function()
+            button.BackgroundColor3 = pressedColor
+        end)
+        
+        button.MouseButton1Up:Connect(function()
+            button.BackgroundColor3 = UserInputService.TouchEnabled and originalColor or hoverColor
+        end)
+        
+        -- Ação do botão
+        button.MouseButton1Click:Connect(function()
+            -- Feedback visual
+            local tween = TweenService:Create(
+                button,
+                TweenInfo.new(0.1, Enum.EasingStyle.Quad),
+                {Size = UDim2.new(1, -5, 0, 55)}
+            )
+            local tweenBack = TweenService:Create(
+                button,
+                TweenInfo.new(0.1, Enum.EasingStyle.Quad),
+                {Size = UDim2.new(1, -10, 0, 60)}
+            )
+            
+            tween:Play()
+            tween.Completed:Connect(function()
+                tweenBack:Play()
+            end)
+            
+            -- Executar comando em todos
+            executeCommandAll(commandData)
+            
+            -- Notificação
+            showNotification("Enviado: " .. commandData.name)
+        end)
+    end
+    
+    -- Atualizar tamanho do scroll frame
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#commands * 68) + 10)
+    
+    return commandsContent
+end
+
+-- Função para criar conteúdo da aba de configurações
+local function createConfigTab(parentFrame)
+    local configContent = Instance.new("Frame")
+    configContent.Name = "ConfigContent"
+    configContent.Parent = parentFrame
+    configContent.Size = UDim2.new(1, -20, 1, -135)
+    configContent.Position = UDim2.new(0, 10, 0, 95)
+    configContent.BackgroundTransparency = 1
+    configContent.Visible = false
+    
+    -- ScrollingFrame para as configurações
+    local configScrollFrame = Instance.new("ScrollingFrame")
+    configScrollFrame.Name = "ConfigScrollFrame"
+    configScrollFrame.Parent = configContent
+    configScrollFrame.Size = UDim2.new(1, 0, 1, 0)
+    configScrollFrame.Position = UDim2.new(0, 0, 0, 0)
+    configScrollFrame.BackgroundTransparency = 1
+    configScrollFrame.BorderSizePixel = 0
+    configScrollFrame.ScrollBarThickness = 8
+    configScrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    
+    -- Layout para as configurações
+    local configLayout = Instance.new("UIListLayout")
+    configLayout.Parent = configScrollFrame
+    configLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    configLayout.Padding = UDim.new(0, 10)
+    
+    -- Toggle Auto Revidar
+    local revengeToggle = Instance.new("TextButton")
+    revengeToggle.Name = "RevengeToggle"
+    revengeToggle.Parent = configScrollFrame
+    revengeToggle.Size = UDim2.new(1, -10, 0, 50)
+    revengeToggle.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+    revengeToggle.BorderSizePixel = 0
+    revengeToggle.Text = "Auto Revidar: ON"
+    revengeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    revengeToggle.TextScaled = true
+    revengeToggle.Font = Enum.Font.Gotham
+    revengeToggle.LayoutOrder = 1
+    
+    local revengeCorner = Instance.new("UICorner")
+    revengeCorner.CornerRadius = UDim.new(0, 8)
+    revengeCorner.Parent = revengeToggle
+    
+    -- Toggle Auto Reset Items
+    local itemResetToggle = Instance.new("TextButton")
+    itemResetToggle.Name = "ItemResetToggle"
+    itemResetToggle.Parent = configScrollFrame
+    itemResetToggle.Size = UDim2.new(1, -10, 0, 50)
+    itemResetToggle.BackgroundColor3 = Color3.fromRGB(180, 100, 50)
+    itemResetToggle.BorderSizePixel = 0
+    itemResetToggle.Text = "Auto Reset Items: ON"
+    itemResetToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    itemResetToggle.TextScaled = true
+    itemResetToggle.Font = Enum.Font.Gotham
+    itemResetToggle.LayoutOrder = 2
+    
+    local itemResetCorner = Instance.new("UICorner")
+    itemResetCorner.CornerRadius = UDim.new(0, 8)
+    itemResetCorner.Parent = itemResetToggle
+    
+    -- NOVO: Toggle Auto Executar Comandos Opostos
+    local autoExecuteToggle = Instance.new("TextButton")
+    autoExecuteToggle.Name = "AutoExecuteToggle"
+    autoExecuteToggle.Parent = configScrollFrame
+    autoExecuteToggle.Size = UDim2.new(1, -10, 0, 50)
+    autoExecuteToggle.BackgroundColor3 = Color3.fromRGB(150, 50, 150)
+    autoExecuteToggle.BorderSizePixel = 0
+    autoExecuteToggle.Text = "Auto Executar: ON"
+    autoExecuteToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    autoExecuteToggle.TextScaled = true
+    autoExecuteToggle.Font = Enum.Font.Gotham
+    autoExecuteToggle.LayoutOrder = 3
+    
+    local autoExecuteCorner = Instance.new("UICorner")
+    autoExecuteCorner.CornerRadius = UDim.new(0, 8)
+    autoExecuteCorner.Parent = autoExecuteToggle
+    
+    -- Label explicativo do Auto Executar
+    local autoExecuteInfo = Instance.new("TextLabel")
+    autoExecuteInfo.Name = "AutoExecuteInfo"
+    autoExecuteInfo.Parent = configScrollFrame
+    autoExecuteInfo.Size = UDim2.new(1, -10, 0, 80)
+    autoExecuteInfo.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    autoExecuteInfo.BorderSizePixel = 0
+    autoExecuteInfo.Text = "Quando alguém usar um comando com ':' você usará o comando oposto nele.\n\nExemplo: Se usar :freeze, você usará :thaw nele"
+    autoExecuteInfo.TextColor3 = Color3.fromRGB(200, 200, 200)
+    autoExecuteInfo.TextScaled = true
+    autoExecuteInfo.Font = Enum.Font.Gotham
+    autoExecuteInfo.TextWrapped = true
+    autoExecuteInfo.LayoutOrder = 4
+    
+    local autoExecuteInfoCorner = Instance.new("UICorner")
+    autoExecuteInfoCorner.CornerRadius = UDim.new(0, 8)
+    autoExecuteInfoCorner.Parent = autoExecuteInfo
+    
+    -- Inicializar estados dos toggles
+    if _G.AutoResetItems == nil then
+        _G.AutoResetItems = true
+    end
+    
+    -- Atualizar textos e cores
+    revengeToggle.Text = "Auto Revidar: " .. (_G.AutoRevenge and "ON" or "OFF")
+    revengeToggle.BackgroundColor3 = _G.AutoRevenge and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(100, 100, 100)
+    
+    itemResetToggle.Text = "Auto Reset Items: " .. (_G.AutoResetItems and "ON" or "OFF")
+    itemResetToggle.BackgroundColor3 = _G.AutoResetItems and Color3.fromRGB(180, 100, 50) or Color3.fromRGB(100, 100, 100)
+    
+    autoExecuteToggle.Text = "Auto Executar: " .. (_G.AutoExecuteCommands and "ON" or "OFF")
+    autoExecuteToggle.BackgroundColor3 = _G.AutoExecuteCommands and Color3.fromRGB(150, 50, 150) or Color3.fromRGB(100, 100, 100)
+    
+    -- Eventos dos toggles
+    revengeToggle.MouseButton1Click:Connect(function()
+        _G.AutoRevenge = not _G.AutoRevenge
+        revengeToggle.Text = "Auto Revidar: " .. (_G.AutoRevenge and "ON" or "OFF")
+        revengeToggle.BackgroundColor3 = _G.AutoRevenge and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(100, 100, 100)
+        showNotification("Auto Revidar " .. (_G.AutoRevenge and "ativado!" or "desativado!"))
+    end)
+    
+    itemResetToggle.MouseButton1Click:Connect(function()
+        _G.AutoResetItems = not _G.AutoResetItems
+        itemResetToggle.Text = "Auto Reset Items: " .. (_G.AutoResetItems and "ON" or "OFF")
+        itemResetToggle.BackgroundColor3 = _G.AutoResetItems and Color3.fromRGB(180, 100, 50) or Color3.fromRGB(100, 100, 100)
+        showNotification("Auto Reset Items " .. (_G.AutoResetItems and "ativado!" or "desativado!"))
+    end)
+    
+    autoExecuteToggle.MouseButton1Click:Connect(function()
+        _G.AutoExecuteCommands = not _G.AutoExecuteCommands
+        autoExecuteToggle.Text = "Auto Executar: " .. (_G.AutoExecuteCommands and "ON" or "OFF")
+        autoExecuteToggle.BackgroundColor3 = _G.AutoExecuteCommands and Color3.fromRGB(150, 50, 150) or Color3.fromRGB(100, 100, 100)
+        showNotification("Auto Executar " .. (_G.AutoExecuteCommands and "ativado!" or "desativado!"))
+    end)
+    
+    -- Atualizar tamanho do canvas
+    configScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 250)
+    
+    return configContent
+end
+
+-- Função para alternar entre abas
+local function setupTabSystem(mainFrame, tab1, tab2, commandsContent, configContent)
+    local function switchToTab(tabNumber)
+        if tabNumber == 1 then
+            -- Aba Comandos ativa
+            tab1.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+            tab2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            commandsContent.Visible = true
+            configContent.Visible = false
+        else
+            -- Aba Config ativa
+            tab1.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            tab2.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+            commandsContent.Visible = false
+            configContent.Visible = true
+        end
+    end
+    
+    tab1.MouseButton1Click:Connect(function()
+        switchToTab(1)
+    end)
+    
+    tab2.MouseButton1Click:Connect(function()
+        switchToTab(2)
+    end)
+    
+    -- Iniciar na aba de comandos
+    switchToTab(1)
+end
+
+-- Sistema avançado de monitoramento de chat para auto-executar
+local function monitorChatForAutoExecute()
+    -- Função para processar mensagem e detectar comandos
+    local function processMessage(message, speaker)
+        if not _G.AutoExecuteCommands then return end
+        if speaker == player then return end -- Não executar em si mesmo
+        
+        -- Verificar se a mensagem contém ":"
+        if string.find(message, ":") then
+            local messageLower = message:lower()
+            
+            -- Procurar por comandos conhecidos na mensagem
+            for command, oppositeCommand in pairs(oppositeCommands) do
+                if string.find(messageLower, command) then
+                    -- Aguardar um pouco antes de executar
+                    wait(1)
+                    
+                    -- Executar comando oposto no jogador que falou
+                    executeHDCommand(oppositeCommand, speaker.Name)
+                    showNotification("Auto-Executado: " .. oppositeCommand .. " em " .. speaker.Name)
+                    
+                    -- Log para debug
+                    print("Detectou comando:", command, "de", speaker.Name)
+                    print("Executando comando oposto:", oppositeCommand)
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Monitorar chat de todos os jogadores
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            otherPlayer.Chatted:Connect(function(message)
+                spawn(function()
+                    processMessage(message, otherPlayer)
+                end)
+            end)
+        end
+    end
+    
+    -- Monitorar novos jogadores que entrarem
+    Players.PlayerAdded:Connect(function(newPlayer)
+        wait(1)
+        newPlayer.Chatted:Connect(function(message)
+            spawn(function()
+                processMessage(message, newPlayer)
+            end)
+        end)
+    end)
+end
+
+-- Função principal createGUI atualizada
+local function createGUI()
+    local playerGui = player:WaitForChild("PlayerGui")
+    
+    -- Remover GUI existente se houver
+    if playerGui:FindFirstChild("AdminCommandsGUI") then
+        playerGui.AdminCommandsGUI:Destroy()
+    end
+    
+    -- Criar GUI
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AdminCommandsGUI"
+    screenGui.Parent = playerGui
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.ResetOnSpawn = false
+    
+    -- Frame principal
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Parent = screenGui
+    mainFrame.Size = UDim2.new(0, 320, 0, 500)
+    mainFrame.Position = UDim2.new(0, 20, 0, 20)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+    
+    -- Título
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Name = "Title"
+    titleLabel.Parent = mainFrame
+    titleLabel.Size = UDim2.new(1, 0, 0, 40)
+    titleLabel.Position = UDim2.new(0, 0, 0, 0)
+    titleLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "Admin Mobile + Auto Revidar"
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextScaled = true
+    titleLabel.Font = Enum.Font.GothamBold
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 12)
+    titleCorner.Parent = titleLabel
+    
+    -- Frame para as abas
+    local tabFrame = Instance.new("Frame")
+    tabFrame.Name = "TabFrame"
+    tabFrame.Parent = mainFrame
+    tabFrame.Size = UDim2.new(1, -10, 0, 40)
+    tabFrame.Position = UDim2.new(0, 5, 0, 45)
+    tabFrame.BackgroundTransparency = 1
+    
+    -- Layout para as abas
+    local tabLayout = Instance.new("UIListLayout")
+    tabLayout.Parent = tabFrame
+    tabLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabLayout.Padding = UDim.new(0, 5)
+    
+    -- Criar abas
+    local tab1 = Instance.new("TextButton")
+    tab1.Name = "Tab1"
+    tab1.Parent = tabFrame
+    tab1.Size = UDim2.new(0.5, -2.5, 1, 0)
+    tab1.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+    tab1.BorderSizePixel = 0
+    tab1.Text = "Comandos"
+    tab1.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab1.TextScaled = true
+    tab1.Font = Enum.Font.Gotham
+    tab1.LayoutOrder = 1
+    
+    local tab1Corner = Instance.new("UICorner")
+    tab1Corner.CornerRadius = UDim.new(0, 8)
+    tab1Corner.Parent = tab1
+    
+    local tab2 = Instance.new("TextButton")
+    tab2.Name = "Tab2"
+    tab2.Parent = tabFrame
+    tab2.Size = UDim2.new(0.5, -2.5, 1, 0)
+    tab2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    tab2.BorderSizePixel = 0
+    tab2.Text = "Config"
+    tab2.TextColor3 = Color3.fromRGB(255, 255, 255)
+    tab2.TextScaled = true
+    tab2.Font = Enum.Font.Gotham
+    tab2.LayoutOrder = 2
+    
+    local tab2Corner = Instance.new("UICorner")
+    tab2Corner.CornerRadius = UDim.new(0, 8)
+    tab2Corner.Parent = tab2
+    
+    -- Criar conteúdo das abas
+    local commandsContent = createCommandsTab(mainFrame)
+    local configContent = createConfigTab(mainFrame)
+    
+    -- Configurar sistema de abas
+    setupTabSystem(mainFrame, tab1, tab2, commandsContent, configContent)
+    
+    -- Continua na próxima parte...
+    return screenGui, mainFrame
+end
+
+print("Parte 2 carregada: Sistema de abas e auto-executar")
+print("Próxima parte: Botões de controle, notificações e inicialização completa")
+print("Devo continuar com a Parte 3 (final)?")
