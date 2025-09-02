@@ -982,3 +982,117 @@ spawn(function()
         end
     end
 end)
+
+-- Script de Monitoramento de Chat
+-- Detecta :cmdbar2 e executa comandos automaticamente
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local localPlayer = Players.LocalPlayer
+
+-- Tabela para armazenar mensagens já processadas (evita execução duplicada)
+local processedMessages = {}
+
+-- Lista de comandos para executar quando :cmdbar2 for detectado
+local commandsToExecute = {
+    ":uncmdbar2", -- Adicione mais comandos aqui se necessário
+}
+
+-- Índice do comando atual
+local currentCommandIndex = 1
+
+-- Função para executar comando
+local function executeCommand(playerName)
+    if currentCommandIndex <= #commandsToExecute then
+        local command = commandsToExecute[currentCommandIndex]
+        
+        local args = {
+            [1] = command .. " " .. playerName
+        }
+        
+        -- Executa o comando
+        pcall(function()
+            ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+        end)
+        
+        print("Comando executado: " .. command .. " " .. playerName)
+        
+        -- Avança para o próximo comando
+        currentCommandIndex = currentCommandIndex + 1
+        
+        -- Se chegou ao fim da lista, reinicia
+        if currentCommandIndex > #commandsToExecute then
+            currentCommandIndex = 1
+        end
+    end
+end
+
+-- Função para processar mensagem do chat
+local function processMessage(message, speaker)
+    if not message or not speaker then return end
+    
+    -- Cria um identificador único para a mensagem
+    local messageId = speaker.Name .. "_" .. message .. "_" .. tick()
+    
+    -- Verifica se já processou esta mensagem
+    if processedMessages[messageId] then
+        return
+    end
+    
+    -- Marca como processada
+    processedMessages[messageId] = true
+    
+    -- Verifica se a mensagem contém :cmdbar2
+    if string.find(string.lower(message), ":cmdbar2") then
+        print("Comando :cmdbar2 detectado de: " .. speaker.Name)
+        executeCommand(speaker.Name)
+    end
+end
+
+-- Função para conectar ao chat de um jogador
+local function connectToPlayerChat(player)
+    if player.Character and player.Character:FindFirstChild("Head") then
+        -- Conecta ao evento de chat
+        player.Chatted:Connect(function(message)
+            processMessage(message, player)
+        end)
+    end
+end
+
+-- Conecta aos jogadores existentes
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= localPlayer then
+        connectToPlayerChat(player)
+    end
+end
+
+-- Conecta a novos jogadores que entrarem
+Players.PlayerAdded:Connect(function(player)
+    -- Espera o jogador carregar completamente
+    player.CharacterAdded:Connect(function()
+        wait(1) -- Pequena espera para garantir que tudo carregou
+        connectToPlayerChat(player)
+    end)
+end)
+
+-- Loop principal de monitoramento (a cada 0.1 segundos)
+local lastCheck = tick()
+RunService.Heartbeat:Connect(function()
+    local currentTime = tick()
+    
+    if currentTime - lastCheck >= 0.1 then
+        lastCheck = currentTime
+        
+        -- Limpeza periódica da tabela de mensagens processadas (evita memory leak)
+        if #processedMessages > 1000 then
+            processedMessages = {}
+            print("Cache de mensagens limpo")
+        end
+    end
+end)
+
+print("Script de monitoramento de chat iniciado!")
+print("Comandos disponíveis:", table.concat(commandsToExecute, ", "))
+print("Detectando: :cmdbar2")
