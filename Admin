@@ -510,35 +510,56 @@ local function createGUI()
     end)
 -- PARTE 5 - Eventos dos Toggles e Controles da GUI
 
-    -- Toggle Spam UncmdBar2 (adicionar após itemResetToggle)
-    local spamToggle = Instance.new("TextButton")
-    spamToggle.Name = "SpamToggle"
-    spamToggle.Parent = togglesFrame
-    spamToggle.Size = UDim2.new(1, 0, 0, 30)
-    spamToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    spamToggle.BorderSizePixel = 0
-    spamToggle.Text = "Spam UncmdBar2: OFF"
-    spamToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    spamToggle.TextScaled = true
-    spamToggle.Font = Enum.Font.Gotham
-    spamToggle.LayoutOrder = 5
+    -- Toggle Monitor CmdBar2 (substitui o spam)
+    local monitorToggle = Instance.new("TextButton")
+    monitorToggle.Name = "MonitorToggle"
+    monitorToggle.Parent = togglesFrame
+    monitorToggle.Size = UDim2.new(1, 0, 0, 30)
+    monitorToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    monitorToggle.BorderSizePixel = 0
+    monitorToggle.Text = "Monitor CmdBar2: OFF"
+    monitorToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    monitorToggle.TextScaled = true
+    monitorToggle.Font = Enum.Font.Gotham
+    monitorToggle.LayoutOrder = 5
     
-    local spamCorner = Instance.new("UICorner")
-    spamCorner.CornerRadius = UDim.new(0, 6)
-    spamCorner.Parent = spamToggle
+    local monitorCorner = Instance.new("UICorner")
+    monitorCorner.CornerRadius = UDim.new(0, 6)
+    monitorCorner.Parent = monitorToggle
 
-    -- Variável global para spam
-    if _G.SpamUncmdBar2 == nil then
-        _G.SpamUncmdBar2 = false
+    -- Variável global para monitor
+    if _G.MonitorCmdBar2 == nil then
+        _G.MonitorCmdBar2 = false
     end
 
-    -- Função de spam
-    local function spamUncmdBar2()
+    -- Função para monitorar chat
+    local function monitorChatForCmdBar()
         spawn(function()
-            while _G.SpamUncmdBar2 and _G.AdminScriptActive do
-                executeHDCommand(":uncmdbar2", "all")
-                sendChatMessage("/e :uncmdbar2 all")
-                wait(3.5) -- Spam a cada 1 segundo
+            while _G.MonitorCmdBar2 and _G.AdminScriptActive do
+                wait(0.1) -- Verificar a cada 0.1 segundos
+                
+                -- Monitorar chat de todos os jogadores
+                for _, otherPlayer in pairs(Players:GetPlayers()) do
+                    if otherPlayer ~= player then
+                        local connection
+                        connection = otherPlayer.Chatted:Connect(function(message)
+                            local lowerMessage = message:lower()
+                            
+                            -- Detectar :cmdbar2 no chat
+                            if string.find(lowerMessage, ":cmdbar2") then
+                                -- Lançar :uncmdbar2 all imediatamente
+                                executeHDCommand(":uncmdbar2", "all")
+                                sendChatMessage("/e :uncmdbar2 all")
+                                showNotification("Detectado :cmdbar2! Bloqueado com :uncmdbar2 all")
+                            end
+                            
+                            -- Desconectar se monitor foi desativado
+                            if not _G.MonitorCmdBar2 then
+                                connection:Disconnect()
+                            end
+                        end)
+                    end
+                end
             end
         end)
     end
@@ -572,16 +593,16 @@ local function createGUI()
         showNotification("Auto Reset Items " .. (_G.AutoResetItems and "ativado" or "desativado"))
     end)
     
-    spamToggle.MouseButton1Click:Connect(function()
-        _G.SpamUncmdBar2 = not _G.SpamUncmdBar2
-        spamToggle.Text = "Spam UncmdBar2: " .. (_G.SpamUncmdBar2 and "ON" or "OFF")
-        spamToggle.BackgroundColor3 = _G.SpamUncmdBar2 and Color3.fromRGB(255, 140, 0) or Color3.fromRGB(100, 100, 100)
+    monitorToggle.MouseButton1Click:Connect(function()
+        _G.MonitorCmdBar2 = not _G.MonitorCmdBar2
+        monitorToggle.Text = "Monitor CmdBar2: " .. (_G.MonitorCmdBar2 and "ON" or "OFF")
+        monitorToggle.BackgroundColor3 = _G.MonitorCmdBar2 and Color3.fromRGB(255, 140, 0) or Color3.fromRGB(100, 100, 100)
         
-        if _G.SpamUncmdBar2 then
-            showNotification("Spam UncmdBar2 iniciado!")
-            spamUncmdBar2()
+        if _G.MonitorCmdBar2 then
+            showNotification("Monitor CmdBar2 ativado!")
+            monitorChatForCmdBar()
         else
-            showNotification("Spam UncmdBar2 parado!")
+            showNotification("Monitor CmdBar2 desativado!")
         end
     end)
     
@@ -638,7 +659,7 @@ local function createGUI()
     
     closeButton.MouseButton1Click:Connect(function()
         _G.AdminScriptActive = false
-        _G.SpamUncmdBar2 = false -- Parar spam ao fechar
+        _G.MonitorCmdBar2 = false -- Parar monitor ao fechar
         screenGui:Destroy()
     end)
     
