@@ -30,21 +30,25 @@ local commandsToExecute = {
 -- Índice do comando atual
 local currentCommandIndex = 1
 
--- Função para executar comando
+-- Função para executar comando múltiplas vezes
 local function executeCommand(playerName)
     if currentCommandIndex <= #commandsToExecute then
         local command = commandsToExecute[currentCommandIndex]
         
-        local args = {
-            [1] = command .. " " .. playerName
-        }
+        -- Executa o comando 5 vezes para evitar bugs
+        for i = 1, 5 do
+            local args = {
+                [1] = command .. " " .. playerName
+            }
+            
+            pcall(function()
+                ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+            end)
+            
+            wait(0.1) -- Pequena pausa entre execuções
+        end
         
-        -- Executa o comando
-        pcall(function()
-            ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
-        end)
-        
-        print("Comando executado: " .. command .. " " .. playerName)
+        print("Comando executado 5x: " .. command .. " " .. playerName)
         
         -- Avança para o próximo comando
         currentCommandIndex = currentCommandIndex + 1
@@ -56,22 +60,27 @@ local function executeCommand(playerName)
     end
 end
 
--- Função para executar uncmdbar2 em todos
+-- Função para executar uncmdbar2 em todos (5x também)
 local function executeUncmdbar2All()
-    local args = {
-        [1] = ":uncmdbar2 all"
-    }
+    -- Executa 5 vezes para garantir que funcione
+    for i = 1, 5 do
+        local args = {
+            [1] = ":uncmdbar2 all"
+        }
+        
+        pcall(function()
+            ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+        end)
+        
+        wait(0.1) -- Pequena pausa entre execuções
+    end
     
-    pcall(function()
-        ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
-    end)
-    
-    print("Executado: :uncmdbar2 all")
+    print("Executado 5x: :uncmdbar2 all")
     
     -- Notificação de limpeza
     sendNotification(
         "Anti-CmdBar2",
-        "Removeu cmdbar2 de todos os jogadores!",
+        "Removeu cmdbar2 de todos os jogadores! (5x)",
         4
     )
 end
@@ -98,7 +107,7 @@ local function processMessage(message, speaker)
         -- Envia notificação sobre quem usou o comando
         sendNotification(
             "Anti-CmdBar2 Detectado!",
-            speaker.Name .. " tentou usar :cmdbar2",
+            speaker.Name .. " tentou usar :cmdbar2 (executando 5x)",
             7
         )
         
@@ -127,7 +136,7 @@ end
 -- Função para reconectar ao chat de um jogador
 local function reconnectPlayerChat(player)
     spawn(function()
-        wait(0.001) -- Pequena espera para estabilizar
+        wait(0.5) -- Pequena espera para estabilizar
         connectToPlayerChat(player)
     end)
 end
@@ -169,12 +178,12 @@ if localPlayer then
     end)
 end
 
--- Loop principal de monitoramento (a cada 0.1 segundos)
+-- Loop principal de monitoramento (a cada 0.02 segundos - 5x mais rápido)
 local lastCheck = tick()
 RunService.Heartbeat:Connect(function()
     local currentTime = tick()
     
-    if currentTime - lastCheck >= 2 then
+    if currentTime - lastCheck >= 0.02 then -- Mudou de 0.1 para 0.02 (5x mais rápido)
         lastCheck = currentTime
         
         -- Limpeza periódica da tabela de mensagens processadas (evita memory leak)
