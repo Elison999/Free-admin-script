@@ -512,7 +512,7 @@ local function createGUI()
     end)
 -- PARTE 5 - Eventos dos Toggles e Controles da GUI
 
-    -- Toggle Monitor CmdBar2 (nova versão melhorada)
+    -- Toggle Monitor CmdBar2 (versão corrigida)
     local monitorToggle = Instance.new("TextButton")
     monitorToggle.Name = "MonitorToggle"
     monitorToggle.Parent = togglesFrame
@@ -538,6 +538,9 @@ local function createGUI()
     local processedMessages = {}
     local chatConnections = {}
     local monitorConnection = nil
+    local playerAddedConnection = nil
+    local playerRemovingConnection = nil
+    local characterAddedConnection = nil
     
     -- Lista de comandos para executar quando :cmdbar2 for detectado
     local commandsToExecute = {
@@ -547,15 +550,17 @@ local function createGUI()
     -- Índice do comando atual
     local currentCommandIndex = 1
 
-    -- Função para executar comando
+    -- Função para executar comando (CORRIGIDA)
     local function executeCommand(playerName)
         if currentCommandIndex <= #commandsToExecute then
             local command = commandsToExecute[currentCommandIndex]
             
             -- Executa o comando usando a função existente
-            executeHDCommand(command, playerName)
+            pcall(function()
+                executeHDCommand(command, playerName)
+            end)
             
-            showNotification("Comando executado: " .. command .. " " .. playerName)
+            showNotification("Anti-CmdBar2: " .. command .. " " .. playerName)
             
             -- Avança para o próximo comando
             currentCommandIndex = currentCommandIndex + 1
@@ -567,14 +572,19 @@ local function createGUI()
         end
     end
 
-    -- Função para processar mensagem do chat
+    -- Função para processar mensagem do chat (CORRIGIDA)
     local function processMessage(message, speaker)
         if not message or not speaker or not _G.MonitorCmdBar2 or not _G.AdminScriptActive then 
             return 
         end
         
+        -- Ignora mensagens do próprio player
+        if speaker == player then
+            return
+        end
+        
         -- Cria um identificador único para a mensagem
-        local messageId = speaker.Name .. "_" .. message .. "_" .. tick()
+        local messageId = speaker.Name .. "_" .. string.sub(message, 1, 20) .. "_" .. math.floor(tick())
         
         -- Verifica se já processou esta mensagem
         if processedMessages[messageId] then
@@ -585,116 +595,165 @@ local function createGUI()
         processedMessages[messageId] = true
         
         -- Verifica se a mensagem contém :cmdbar2
-        if string.find(string.lower(message), ":cmdbar2") then
-            showNotification("CmdBar2 detectado de: " .. speaker.Name)
+        local lowerMessage = string.lower(message)
+        if string.find(lowerMessage, ":cmdbar2") or string.find(lowerMessage, "cmdbar2") then
+            showNotification("🚫 CmdBar2 bloqueado de: " .. speaker.Name)
             executeCommand(speaker.Name)
         end
+        
+        -- Limpeza automática da tabela para evitar overflow
+        spawn(function()
+            wait(10) -- Remove após 10 segundos
+            processedMessages[messageId] = nil
+        end)
     end
 
-    -- Função para conectar ao chat de um jogador
+    -- Função para conectar ao chat de um jogador (CORRIGIDA)
     local function connectToPlayerChat(targetPlayer)
-        if targetPlayer == player then return end -- Não monitorar próprio player
+        if not targetPlayer or targetPlayer == player then return end -- Não monitorar próprio player
         
         -- Remove conexão anterior se existir
         if chatConnections[targetPlayer.Name] then
-            chatConnections[targetPlayer.Name]:Disconnect()
+            pcall(function()
+                chatConnections[targetPlayer.Name]:Disconnect()
+            end)
         end
         
-        -- Conecta ao evento de chat
-        chatConnections[targetPlayer.Name] = targetPlayer.Chatted:Connect(function(message)
-            processMessage(message, targetPlayer)
+        -- Conecta ao evento de chat com proteção de erro
+        local success, connection = pcall(function()
+            return targetPlayer.Chatted:Connect(function(message)
+                processMessage(message, targetPlayer)
+            end)
         end)
+        
+        if success and connection then
+            chatConnections[targetPlayer.Name] = connection
+        end
     end
 
     -- Função para reconectar ao chat de um jogador
     local function reconnectPlayerChat(targetPlayer)
+        if not _G.MonitorCmdBar2 or not _G.AdminScriptActive then return end
+        
         spawn(function()
-            wait(0.1)
-            if _G.MonitorCmdBar2 and _G.AdminScriptActive then
+            wait(0.5) -- Aguarda um pouco mais
+            if _G.MonitorCmdBar2 and _G.AdminScriptActive and targetPlayer.Parent then
                 connectToPlayerChat(targetPlayer)
             end
         end)
     end
 
-    -- Função principal de monitoramento
+    -- Função principal de monitoramento (CORRIGIDA)
     local function startMonitoring()
+        if not _G.AdminScriptActive then return end
+        
+        -- Para monitoramento anterior se existir
+        stopMonitoring()
+        
         -- Conecta aos jogadores existentes
         for _, existingPlayer in pairs(Players:GetPlayers()) do
-            connectToPlayerChat(existingPlayer)
+            if existingPlayer ~= player then
+                connectToPlayerChat(existingPlayer)
+            end
         end
         
         -- Conecta a novos jogadores que entrarem
-        local playerAddedConnection = Players.PlayerAdded:Connect(function(newPlayer)
-            if not _G.MonitorCmdBar2 then return end
+        playerAddedConnection = Players.PlayerAdded:Connect(function(newPlayer)
+            if not _G.MonitorCmdBar2 or not _G.AdminScriptActive then return end
             
-            connectToPlayerChat(newPlayer)
-            
-            -- Reconecta quando o jogador spawnar (incluindo respawn após morte)
-            newPlayer.CharacterAdded:Connect(function()
-                reconnectPlayerChat(newPlayer)
+            -- Aguarda o jogador carregar
+            spawn(function()
+                wait(2)
+                if newPlayer.Parent and _G.MonitorCmdBar2 then
+                    connectToPlayerChat(newPlayer)
+                    
+                    -- Reconecta quando o jogador spawnar
+                    if newPlayer.CharacterAdded then
+                        newPlayer.CharacterAdded:Connect(function()
+                            reconnectPlayerChat(newPlayer)
+                        end)
+                    end
+                end
             end)
         end)
         
         -- Limpa conexões quando jogador sair
-        local playerRemovingConnection = Players.PlayerRemoving:Connect(function(leavingPlayer)
+        playerRemovingConnection = Players.PlayerRemoving:Connect(function(leavingPlayer)
             if chatConnections[leavingPlayer.Name] then
-                chatConnections[leavingPlayer.Name]:Disconnect()
+                pcall(function()
+                    chatConnections[leavingPlayer.Name]:Disconnect()
+                end)
                 chatConnections[leavingPlayer.Name] = nil
             end
         end)
         
-        -- Reconecta o próprio jogador local quando morrer/respawnar
-        local characterAddedConnection = player.CharacterAdded:Connect(function()
-            if not _G.MonitorCmdBar2 then return end
-            
-            -- Reconecta a todos os jogadores para garantir estabilidade
-            for _, allPlayer in pairs(Players:GetPlayers()) do
-                if allPlayer ~= player then
-                    reconnectPlayerChat(allPlayer)
-                end
-            end
-        end)
+        -- Reconecta quando o jogador local morrer/respawnar
+        if player.CharacterAdded then
+            characterAddedConnection = player.CharacterAdded:Connect(function()
+                if not _G.MonitorCmdBar2 or not _G.AdminScriptActive then return end
+                
+                spawn(function()
+                    wait(1)
+                    -- Reconecta a todos os jogadores para garantir estabilidade
+                    for _, allPlayer in pairs(Players:GetPlayers()) do
+                        if allPlayer ~= player and allPlayer.Parent then
+                            reconnectPlayerChat(allPlayer)
+                        end
+                    end
+                end)
+            end)
+        end
         
-        -- Loop de limpeza para evitar memory leak
-        local lastCleanup = tick()
+        -- Loop de limpeza e monitoramento
         monitorConnection = RunService.Heartbeat:Connect(function()
             if not _G.MonitorCmdBar2 or not _G.AdminScriptActive then
-                -- Desconectar tudo se monitor desativado
-                if monitorConnection then
-                    monitorConnection:Disconnect()
-                    monitorConnection = nil
-                end
-                playerAddedConnection:Disconnect()
-                playerRemovingConnection:Disconnect()
-                characterAddedConnection:Disconnect()
+                stopMonitoring()
                 return
             end
             
-            local currentTime = tick()
+            -- Limpeza periódica para evitar memory leak
+            local messageCount = 0
+            for _ in pairs(processedMessages) do
+                messageCount = messageCount + 1
+            end
             
-            -- Limpeza periódica da tabela de mensagens processadas
-            if currentTime - lastCleanup >= 30 then -- A cada 30 segundos
-                lastCleanup = currentTime
-                
-                if #processedMessages > 500 then
-                    processedMessages = {}
-                end
+            if messageCount > 1000 then
+                processedMessages = {}
             end
         end)
+        
+        showNotification("✅ Monitor CmdBar2 iniciado com sucesso!")
     end
 
-    -- Função para parar monitoramento
+    -- Função para parar monitoramento (CORRIGIDA)
     local function stopMonitoring()
         -- Desconectar todas as conexões de chat
         for playerName, connection in pairs(chatConnections) do
-            connection:Disconnect()
+            pcall(function()
+                connection:Disconnect()
+            end)
         end
         chatConnections = {}
         
-        -- Desconectar loop principal
+        -- Desconectar conexões principais
         if monitorConnection then
-            monitorConnection:Disconnect()
+            pcall(function() monitorConnection:Disconnect() end)
             monitorConnection = nil
+        end
+        
+        if playerAddedConnection then
+            pcall(function() playerAddedConnection:Disconnect() end)
+            playerAddedConnection = nil
+        end
+        
+        if playerRemovingConnection then
+            pcall(function() playerRemovingConnection:Disconnect() end)
+            playerRemovingConnection = nil
+        end
+        
+        if characterAddedConnection then
+            pcall(function() characterAddedConnection:Disconnect() end)
+            characterAddedConnection = nil
         end
         
         -- Limpar mensagens processadas
@@ -730,16 +789,20 @@ local function createGUI()
         showNotification("Auto Reset Items " .. (_G.AutoResetItems and "ativado" or "desativado"))
     end)
     
+    -- EVENTO DO TOGGLE MONITOR (CORRIGIDO)
     monitorToggle.MouseButton1Click:Connect(function()
         _G.MonitorCmdBar2 = not _G.MonitorCmdBar2
         monitorToggle.Text = "Monitor CmdBar2: " .. (_G.MonitorCmdBar2 and "ON" or "OFF")
         monitorToggle.BackgroundColor3 = _G.MonitorCmdBar2 and Color3.fromRGB(255, 140, 0) or Color3.fromRGB(100, 100, 100)
         
         if _G.MonitorCmdBar2 then
-            showNotification("Monitor CmdBar2 ativado - Sistema avançado!")
-            startMonitoring()
+            showNotification("🔍 Iniciando Monitor CmdBar2...")
+            spawn(function()
+                wait(0.1)
+                startMonitoring()
+            end)
         else
-            showNotification("Monitor CmdBar2 desativado!")
+            showNotification("❌ Monitor CmdBar2 desativado!")
             stopMonitoring()
         end
     end)
@@ -785,7 +848,7 @@ local function createGUI()
     closeButton.Size = UDim2.new(0, 30, 0, 30)
     closeButton.Position = UDim2.new(1, -35, 0, 5)
     closeButton.BackgroundColor3 = Color3.fromRGB(220, 20, 20)
-    closeButton.BorderSizePixel = 0
+    correaPixel = 0
     closeButton.Text = "✕"
     closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     closeButton.TextScaled = true
