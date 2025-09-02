@@ -1,4 +1,4 @@
--- Script de Comandos Administrativos para Mobile
+-- Script de Comandos Administrativos para Mobile - PARTE 1
 -- Interface otimizada para toque com auto-revidar e persistência
 
 local Players = game:GetService("Players")
@@ -12,25 +12,72 @@ local player = Players.LocalPlayer
 -- Variáveis globais para persistência
 _G.AdminScriptActive = true
 _G.AutoRevenge = true
+_G.AutoResetItems = true
+_G.AutoTargetBack = true
+_G.AntiCommands = false
 
--- Lista de comandos disponíveis
-local commands = {
-    {name = "Explodir Todos", cmd = ":explode", chat = "/e :explode all"},
-    {name = "Trazer Todos", cmd = ":bring", chat = "/e :bring all"},
-    {name = "Congelar Todos", cmd = ":freeze", chat = "/e :freeze all"},
-    {name = "Gelo Todos", cmd = ":ice", chat = "/e :ice all"},
-    {name = "Gigante Todos", cmd = ":giant", chat = "/e :giant all"},
-    {name = "Anão Todos", cmd = ":dwarf", chat = "/e :dwarf all"},
-    {name = "Voar Todos", cmd = ":fly", chat = "/e :fly all"},
-    {name = "Velocidade Todos", cmd = ":speed", chat = "/e :speed all"},
-    {name = "Pular Alto Todos", cmd = ":jumppower", chat = "/e :jumppower all"},
-    {name = "Invisível Todos", cmd = ":invisible", chat = "/e :invisible all"},
-    {name = "Visível Todos", cmd = ":visible", chat = "/e :visible all"},
-    {name = "Matar Todos", cmd = ":kill", chat = "/e :kill all"},
-    {name = "Curar Todos", cmd = ":heal", chat = "/e :heal all"},
-    {name = "Descongelar Todos", cmd = ":thaw", chat = "/e :thaw all"},
-    {name = "Parar Voo Todos", cmd = ":unfly", chat = "/e :unfly all"}
+-- Lista de comandos disponíveis por categoria
+local commandCategories = {
+    Admin = {
+        {name = "Explodir Todos", cmd = ":explode", chat = "/e :explode all"},
+        {name = "Trazer Todos", cmd = ":bring", chat = "/e :bring all"},
+        {name = "Congelar Todos", cmd = ":freeze", chat = "/e :freeze all"},
+        {name = "Gelo Todos", cmd = ":ice", chat = "/e :ice all"},
+        {name = "Gigante Todos", cmd = ":giant", chat = "/e :giant all"},
+        {name = "Anão Todos", cmd = ":dwarf", chat = "/e :dwarf all"},
+        {name = "Voar Todos", cmd = ":fly", chat = "/e :fly all"},
+        {name = "Velocidade Todos", cmd = ":speed", chat = "/e :speed all"},
+        {name = "Pular Alto Todos", cmd = ":jumppower", chat = "/e :jumppower all"},
+        {name = "Invisível Todos", cmd = ":invisible", chat = "/e :invisible all"},
+        {name = "Visível Todos", cmd = ":visible", chat = "/e :visible all"},
+        {name = "Matar Todos", cmd = ":kill", chat = "/e :kill all"},
+        {name = "Curar Todos", cmd = ":heal", chat = "/e :heal all"},
+        {name = "Descongelar Todos", cmd = ":thaw", chat = "/e :thaw all"},
+        {name = "Parar Voo Todos", cmd = ":unfly", chat = "/e :unfly all"}
+    },
+    Combat = {
+        {name = "Fling Todos", cmd = ":fling", chat = "/e :fling all"},
+        {name = "Stun Todos", cmd = ":stun", chat = "/e :stun all"},
+        {name = "Unstun Todos", cmd = ":unstun", chat = "/e :unstun all"},
+        {name = "Punish Todos", cmd = ":punish", chat = "/e :punish all"},
+        {name = "Unpunish Todos", cmd = ":unpunish", chat = "/e :unpunish all"},
+        {name = "Crash Todos", cmd = ":crash", chat = "/e :crash all"},
+        {name = "Kick Todos", cmd = ":kick", chat = "/e :kick all"},
+        {name = "Ban Todos", cmd = ":ban", chat = "/e :ban all"},
+        {name = "Blind Todos", cmd = ":blind", chat = "/e :blind all"},
+        {name = "Unblind Todos", cmd = ":unblind", chat = "/e :unblind all"},
+        {name = "Jail Todos", cmd = ":jail", chat = "/e :jail all"},
+        {name = "Unjail Todos", cmd = ":unjail", chat = "/e :unjail all"},
+        {name = "Mute Todos", cmd = ":mute", chat = "/e :mute all"},
+        {name = "Unmute Todos", cmd = ":unmute", chat = "/e :unmute all"},
+        {name = "Dog Todos", cmd = ":dog", chat = "/e :dog all"}
+    }
 }
+
+-- Mapa de comandos para seus reversos (para anti-commands)
+local commandReverses = {
+    [":freeze"] = ":thaw",
+    [":thaw"] = ":freeze", 
+    [":kill"] = ":heal",
+    [":heal"] = ":kill",
+    [":invisible"] = ":visible",
+    [":visible"] = ":invisible",
+    [":fly"] = ":unfly",
+    [":unfly"] = ":fly",
+    [":jail"] = ":unjail",
+    [":unjail"] = ":jail",
+    [":blind"] = ":unblind",
+    [":unblind"] = ":blind",
+    [":mute"] = ":unmute",
+    [":unmute"] = ":mute",
+    [":stun"] = ":unstun",
+    [":unstun"] = ":stun",
+    [":punish"] = ":unpunish",
+    [":unpunish"] = ":punish",
+    [":fling"] = ":unfling",
+    [":unfling"] = ":fling"
+}
+-- PARTE 2 - Funções Básicas e Sistema de Monitoramento
 
 -- Função para enviar mensagem no chat
 local function sendChatMessage(message)
@@ -77,38 +124,114 @@ local function executeCommandAll(commandData)
     end
 end
 
--- Sistema de auto-revidar
-local lastCommands = {}
+-- Sistema avançado de monitoramento de comandos
+local function monitorCommandsAdvanced()
+    spawn(function()
+        while _G.AdminScriptActive do
+            wait(0.5)
+            
+            -- Monitorar chat de todos os jogadores
+            for _, otherPlayer in pairs(Players:GetPlayers()) do
+                if otherPlayer ~= player then
+                    otherPlayer.Chatted:Connect(function(message)
+                        local lowerMessage = message:lower()
+                        
+                        -- Verificar se mencionou o nome do player
+                        if string.find(lowerMessage, player.Name:lower()) then
+                            
+                            -- Procurar por comandos em todas as categorias
+                            for categoryName, commands in pairs(commandCategories) do
+                                for _, cmd in pairs(commands) do
+                                    local cmdLower = cmd.cmd:lower()
+                                    
+                                    if string.find(lowerMessage, cmdLower) then
+                                        wait(1) -- Aguardar antes de agir
+                                        
+                                        -- Anti-Commands: usar comando reverso
+                                        if _G.AntiCommands then
+                                            local reverseCmd = commandReverses[cmd.cmd]
+                                            if reverseCmd then
+                                                executeHDCommand(reverseCmd, player.Name)
+                                                showNotification("Anti-Command: " .. reverseCmd .. " em mim")
+                                            end
+                                        end
+                                        
+                                        -- Auto Target Back: usar mesmo comando no atacante
+                                        if _G.AutoTargetBack then
+                                            executeHDCommand(cmd.cmd, otherPlayer.Name)
+                                            showNotification("Target Back: " .. cmd.cmd .. " em " .. otherPlayer.Name)
+                                        end
+                                        
+                                        -- Auto Revenge (sistema antigo mantido)
+                                        if _G.AutoRevenge then
+                                            executeHDCommand(cmd.cmd, otherPlayer.Name)
+                                            showNotification("Revenge: " .. cmd.cmd .. " em " .. otherPlayer.Name)
+                                        end
+                                        
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                end
+            end
+            
+            wait(10) -- Aguardar antes de reconectar eventos
+        end
+    end)
+end
 
-local function monitorCommands()
-    if not ReplicatedStorage:FindFirstChild("HDAdminClient") then
-        return
-    end
-    
-    -- Monitorar quando comandos são usados em você
-    local function onCommandUsed(commandData)
-        if commandData and commandData.Target and commandData.Command and commandData.Executor then
-            if commandData.Target == player.Name and commandData.Executor ~= player.Name then
-                local executor = commandData.Executor
-                local command = commandData.Command
-                
-                -- Aguardar um pouco antes de revidar
+-- Função para monitorar backpacks e usar reset automaticamente
+local function monitorBackpacks()
+    spawn(function()
+        while _G.AdminScriptActive do
+            wait(3) -- Verificar a cada 3 segundos
+            
+            if not _G.AutoResetItems then
                 wait(1)
-                
-                if _G.AutoRevenge then
-                    -- Revidar com o mesmo comando
-                    executeHDCommand(":" .. command, executor)
-                    showNotification("Revidando " .. executor .. " com :" .. command)
+                continue
+            end
+            
+            for _, targetPlayer in pairs(Players:GetPlayers()) do
+                if targetPlayer ~= player and targetPlayer.Character then
+                    local backpack = targetPlayer:FindFirstChild("Backpack")
+                    local character = targetPlayer.Character
+                    
+                    -- Verificar backpack
+                    local hasBackpackItems = false
+                    if backpack then
+                        for _, item in pairs(backpack:GetChildren()) do
+                            if item:IsA("Tool") or item:IsA("HopperBin") then
+                                hasBackpackItems = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    -- Verificar se está segurando algum tool
+                    local hasEquippedTool = false
+                    if character:FindFirstChild("Humanoid") then
+                        for _, item in pairs(character:GetChildren()) do
+                            if item:IsA("Tool") then
+                                hasEquippedTool = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    -- Se tem items no backpack ou equipado, usar reset
+                    if hasBackpackItems or hasEquippedTool then
+                        executeHDCommand(":reset", targetPlayer.Name)
+                        showNotification("Auto Reset: " .. targetPlayer.Name .. " (tinha items)")
+                        wait(2) -- Aguardar antes de verificar novamente
+                    end
                 end
             end
         end
-    end
-    
-    -- Conectar ao sistema de monitoramento
-    pcall(function()
-        ReplicatedStorage.HDAdminClient.Signals.CommandUsed.OnClientEvent:Connect(onCommandUsed)
     end)
 end
+-- PARTE 3 - Interface GUI (Primeira Parte)
 
 -- Função para criar GUI
 local function createGUI()
@@ -124,20 +247,19 @@ local function createGUI()
     screenGui.Name = "AdminCommandsGUI"
     screenGui.Parent = playerGui
     screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.ResetOnSpawn = false -- Manter após morrer
+    screenGui.ResetOnSpawn = false
     
     -- Frame principal
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Parent = screenGui
-    mainFrame.Size = UDim2.new(0, 300, 0, 450)
+    mainFrame.Size = UDim2.new(0, 320, 0, 500)
     mainFrame.Position = UDim2.new(0, 20, 0, 20)
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Draggable = true
     
-    -- Bordas arredondadas
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
@@ -150,7 +272,7 @@ local function createGUI()
     titleLabel.Position = UDim2.new(0, 0, 0, 0)
     titleLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     titleLabel.BorderSizePixel = 0
-    titleLabel.Text = "Admin Mobile + Auto Revidar"
+    titleLabel.Text = "Admin Mobile Pro"
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     titleLabel.TextScaled = true
     titleLabel.Font = Enum.Font.GothamBold
@@ -159,157 +281,263 @@ local function createGUI()
     titleCorner.CornerRadius = UDim.new(0, 12)
     titleCorner.Parent = titleLabel
     
-    -- Toggle Auto Revidar
+    -- Frame dos toggles
+    local togglesFrame = Instance.new("Frame")
+    togglesFrame.Name = "TogglesFrame"
+    togglesFrame.Parent = mainFrame
+    togglesFrame.Size = UDim2.new(1, -20, 0, 140)
+    togglesFrame.Position = UDim2.new(0, 10, 0, 45)
+    togglesFrame.BackgroundTransparency = 1
+    
+    local toggleLayout = Instance.new("UIListLayout")
+    toggleLayout.Parent = togglesFrame
+    toggleLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    toggleLayout.Padding = UDim.new(0, 5)
+    
+    -- Toggle Auto Revenge
     local revengeToggle = Instance.new("TextButton")
     revengeToggle.Name = "RevengeToggle"
-    revengeToggle.Parent = mainFrame
-    revengeToggle.Size = UDim2.new(1, -20, 0, 35)
-    revengeToggle.Position = UDim2.new(0, 10, 0, 45)
+    revengeToggle.Parent = togglesFrame
+    revengeToggle.Size = UDim2.new(1, 0, 0, 30)
     revengeToggle.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
     revengeToggle.BorderSizePixel = 0
-    revengeToggle.Text = "Auto Revidar: ON"
+    revengeToggle.Text = "Auto Revenge: ON"
     revengeToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
     revengeToggle.TextScaled = true
     revengeToggle.Font = Enum.Font.Gotham
+    revengeToggle.LayoutOrder = 1
     
     local revengeCorner = Instance.new("UICorner")
     revengeCorner.CornerRadius = UDim.new(0, 6)
     revengeCorner.Parent = revengeToggle
     
+    -- Toggle Auto Target Back
+    local targetBackToggle = Instance.new("TextButton")
+    targetBackToggle.Name = "TargetBackToggle"
+    targetBackToggle.Parent = togglesFrame
+    targetBackToggle.Size = UDim2.new(1, 0, 0, 30)
+    targetBackToggle.BackgroundColor3 = Color3.fromRGB(150, 50, 150)
+    targetBackToggle.BorderSizePixel = 0
+    targetBackToggle.Text = "Auto Target Back: ON"
+    targetBackToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    targetBackToggle.TextScaled = true
+    targetBackToggle.Font = Enum.Font.Gotham
+    targetBackToggle.LayoutOrder = 2
+    
+    local targetBackCorner = Instance.new("UICorner")
+    targetBackCorner.CornerRadius = UDim.new(0, 6)
+    targetBackCorner.Parent = targetBackToggle
+    
+    -- Toggle Anti Commands
+    local antiCommandsToggle = Instance.new("TextButton")
+    antiCommandsToggle.Name = "AntiCommandsToggle"
+    antiCommandsToggle.Parent = togglesFrame
+    antiCommandsToggle.Size = UDim2.new(1, 0, 0, 30)
+    antiCommandsToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    antiCommandsToggle.BorderSizePixel = 0
+    antiCommandsToggle.Text = "Anti-Commands: OFF"
+    antiCommandsToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    antiCommandsToggle.TextScaled = true
+    antiCommandsToggle.Font = Enum.Font.Gotham
+    antiCommandsToggle.LayoutOrder = 3
+    
+    local antiCommandsCorner = Instance.new("UICorner")
+    antiCommandsCorner.CornerRadius = UDim.new(0, 6)
+    antiCommandsCorner.Parent = antiCommandsToggle
+    
     -- Toggle Auto Reset Items
     local itemResetToggle = Instance.new("TextButton")
     itemResetToggle.Name = "ItemResetToggle"
-    itemResetToggle.Parent = mainFrame
-    itemResetToggle.Size = UDim2.new(1, -20, 0, 35)
-    itemResetToggle.Position = UDim2.new(0, 10, 0, 85)
+    itemResetToggle.Parent = togglesFrame
+    itemResetToggle.Size = UDim2.new(1, 0, 0, 30)
     itemResetToggle.BackgroundColor3 = Color3.fromRGB(180, 100, 50)
     itemResetToggle.BorderSizePixel = 0
     itemResetToggle.Text = "Auto Reset Items: ON"
     itemResetToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
     itemResetToggle.TextScaled = true
     itemResetToggle.Font = Enum.Font.Gotham
+    itemResetToggle.LayoutOrder = 4
     
     local itemResetCorner = Instance.new("UICorner")
     itemResetCorner.CornerRadius = UDim.new(0, 6)
     itemResetCorner.Parent = itemResetToggle
+-- PARTE 4 - Interface GUI (Abas e Sistema de Comandos)
+
+    -- Frame das abas
+    local tabsFrame = Instance.new("Frame")
+    tabsFrame.Name = "TabsFrame"
+    tabsFrame.Parent = mainFrame
+    tabsFrame.Size = UDim2.new(1, -20, 0, 35)
+    tabsFrame.Position = UDim2.new(0, 10, 0, 190)
+    tabsFrame.BackgroundTransparency = 1
     
-    -- Variável global para controlar auto reset
-    if _G.AutoResetItems == nil then
-        _G.AutoResetItems = true
-    end
+    local tabsLayout = Instance.new("UIListLayout")
+    tabsLayout.Parent = tabsFrame
+    tabsLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabsLayout.Padding = UDim.new(0, 5)
     
-    itemResetToggle.Text = "Auto Reset Items: " .. (_G.AutoResetItems and "ON" or "OFF")
-    itemResetToggle.BackgroundColor3 = _G.AutoResetItems and Color3.fromRGB(180, 100, 50) or Color3.fromRGB(100, 100, 100)
+    -- Botão aba Admin
+    local adminTab = Instance.new("TextButton")
+    adminTab.Name = "AdminTab"
+    adminTab.Parent = tabsFrame
+    adminTab.Size = UDim2.new(0.48, 0, 1, 0)
+    adminTab.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+    adminTab.BorderSizePixel = 0
+    adminTab.Text = "Admin"
+    adminTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    adminTab.TextScaled = true
+    adminTab.Font = Enum.Font.GothamBold
+    adminTab.LayoutOrder = 1
     
-    itemResetToggle.MouseButton1Click:Connect(function()
-        _G.AutoResetItems = not _G.AutoResetItems
-        itemResetToggle.Text = "Auto Reset Items: " .. (_G.AutoResetItems and "ON" or "OFF")
-        itemResetToggle.BackgroundColor3 = _G.AutoResetItems and Color3.fromRGB(180, 100, 50) or Color3.fromRGB(100, 100, 100)
-        
-        if _G.AutoResetItems then
-            showNotification("Auto Reset Items ativado!")
-        else
-            showNotification("Auto Reset Items desativado!")
-        end
-    end)
+    local adminTabCorner = Instance.new("UICorner")
+    adminTabCorner.CornerRadius = UDim.new(0, 6)
+    adminTabCorner.Parent = adminTab
     
-    -- ScrollingFrame para os botões
+    -- Botão aba Combat
+    local combatTab = Instance.new("TextButton")
+    combatTab.Name = "CombatTab"
+    combatTab.Parent = tabsFrame
+    combatTab.Size = UDim2.new(0.48, 0, 1, 0)
+    combatTab.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+    combatTab.BorderSizePixel = 0
+    combatTab.Text = "Combat"
+    combatTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+    combatTab.TextScaled = true
+    combatTab.Font = Enum.Font.GothamBold
+    combatTab.LayoutOrder = 2
+    
+    local combatTabCorner = Instance.new("UICorner")
+    combatTabCorner.CornerRadius = UDim.new(0, 6)
+    combatTabCorner.Parent = combatTab
+    
+    -- ScrollingFrame para os comandos
     local scrollFrame = Instance.new("ScrollingFrame")
     scrollFrame.Name = "CommandsFrame"
     scrollFrame.Parent = mainFrame
-    scrollFrame.Size = UDim2.new(1, -20, 1, -140)
-    scrollFrame.Position = UDim2.new(0, 10, 0, 130)
+    scrollFrame.Size = UDim2.new(1, -20, 1, -245)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 230)
     scrollFrame.BackgroundTransparency = 1
     scrollFrame.BorderSizePixel = 0
     scrollFrame.ScrollBarThickness = 8
     scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
     
-    -- Layout para os botões
     local listLayout = Instance.new("UIListLayout")
     listLayout.Parent = scrollFrame
     listLayout.SortOrder = Enum.SortOrder.LayoutOrder
     listLayout.Padding = UDim.new(0, 8)
     
-    -- Criar botões para cada comando
-    for i, commandData in pairs(commands) do
-        local button = Instance.new("TextButton")
-        button.Name = "Command" .. i
-        button.Parent = scrollFrame
-        button.Size = UDim2.new(1, -10, 0, 60)
-        button.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
-        button.BorderSizePixel = 0
-        button.Text = commandData.name
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.TextScaled = true
-        button.Font = Enum.Font.Gotham
-        button.LayoutOrder = i
-        
-        -- Bordas arredondadas do botão
-        local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 8)
-        buttonCorner.Parent = button
-        
-        -- Efeito de hover/toque
-        local originalColor = Color3.fromRGB(70, 130, 180)
-        local hoverColor = Color3.fromRGB(90, 150, 200)
-        local pressedColor = Color3.fromRGB(50, 110, 160)
-        
-        -- Eventos do botão
-        button.MouseEnter:Connect(function()
-            if not UserInputService.TouchEnabled then
-                button.BackgroundColor3 = hoverColor
+    -- Variável para controlar aba atual
+    local currentTab = "Admin"
+    
+    -- Função para atualizar comandos na interface
+    local function updateCommands()
+        -- Limpar comandos existentes
+        for _, child in pairs(scrollFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
             end
-        end)
+        end
         
-        button.MouseLeave:Connect(function()
-            if not UserInputService.TouchEnabled then
-                button.BackgroundColor3 = originalColor
-            end
-        end)
+        local commands = commandCategories[currentTab] or {}
         
-        button.MouseButton1Down:Connect(function()
-            button.BackgroundColor3 = pressedColor
-        end)
-        
-        button.MouseButton1Up:Connect(function()
-            button.BackgroundColor3 = UserInputService.TouchEnabled and originalColor or hoverColor
-        end)
-        
-        -- Ação do botão
-        button.MouseButton1Click:Connect(function()
-            -- Feedback visual
-            local tween = TweenService:Create(
-                button,
-                TweenInfo.new(0.1, Enum.EasingStyle.Quad),
-                {Size = UDim2.new(1, -5, 0, 55)}
-            )
-            local tweenBack = TweenService:Create(
-                button,
-                TweenInfo.new(0.1, Enum.EasingStyle.Quad),
-                {Size = UDim2.new(1, -10, 0, 60)}
-            )
+        -- Criar botões para cada comando
+        for i, commandData in pairs(commands) do
+            local button = Instance.new("TextButton")
+            button.Name = "Command" .. i
+            button.Parent = scrollFrame
+            button.Size = UDim2.new(1, -10, 0, 50)
+            button.BackgroundColor3 = currentTab == "Admin" and Color3.fromRGB(70, 130, 180) or Color3.fromRGB(180, 50, 50)
+            button.BorderSizePixel = 0
+            button.Text = commandData.name
+            button.TextColor3 = Color3.fromRGB(255, 255, 255)
+            button.TextScaled = true
+            button.Font = Enum.Font.Gotham
+            button.LayoutOrder = i
             
-            tween:Play()
-            tween.Completed:Connect(function()
-                tweenBack:Play()
+            local buttonCorner = Instance.new("UICorner")
+            buttonCorner.CornerRadius = UDim.new(0, 8)
+            buttonCorner.Parent = button
+            
+            -- Eventos do botão
+            button.MouseButton1Click:Connect(function()
+                local originalColor = button.BackgroundColor3
+                local pressedColor = Color3.fromRGB(
+                    math.max(0, originalColor.R * 255 - 20),
+                    math.max(0, originalColor.G * 255 - 20),
+                    math.max(0, originalColor.B * 255 - 20)
+                )
+                
+                local tween = TweenService:Create(
+                    button,
+                    TweenInfo.new(0.1, Enum.EasingStyle.Quad),
+                    {BackgroundColor3 = Color3.fromRGB(pressedColor.R, pressedColor.G, pressedColor.B)}
+                )
+                local tweenBack = TweenService:Create(
+                    button,
+                    TweenInfo.new(0.1, Enum.EasingStyle.Quad),
+                    {BackgroundColor3 = originalColor}
+                )
+                
+                tween:Play()
+                tween.Completed:Connect(function()
+                    tweenBack:Play()
+                end)
+                
+                sendChatMessage(commandData.chat)
+                wait(0.3)
+                executeCommandAll(commandData)
+                showNotification("Enviado: " .. commandData.name)
             end)
-            
-            -- Enviar comando no chat
-            sendChatMessage(commandData.chat)
-            
-            -- Aguardar um pouco antes de executar
-            wait(0.3)
-            
-            -- Executar comando em todos
-            executeCommandAll(commandData)
-            
-            -- Notificação
-            showNotification("Enviado: " .. commandData.name)
-        end)
+        end
+        
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#commands * 58) + 10)
     end
     
-    -- Atualizar tamanho do scroll frame
-    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#commands * 68) + 10)
+    -- Eventos das abas
+    adminTab.MouseButton1Click:Connect(function()
+        currentTab = "Admin"
+        adminTab.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+        combatTab.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        updateCommands()
+    end)
+    
+    combatTab.MouseButton1Click:Connect(function()
+        currentTab = "Combat"
+        combatTab.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+        adminTab.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+        updateCommands()
+    end)
+-- PARTE 5 - Eventos dos Toggles e Controles da GUI
+
+    -- Eventos dos toggles
+    revengeToggle.MouseButton1Click:Connect(function()
+        _G.AutoRevenge = not _G.AutoRevenge
+        revengeToggle.Text = "Auto Revenge: " .. (_G.AutoRevenge and "ON" or "OFF")
+        revengeToggle.BackgroundColor3 = _G.AutoRevenge and Color3.fromRGB(50, 150, 50) or Color3.fromRGB(100, 100, 100)
+        showNotification("Auto Revenge " .. (_G.AutoRevenge and "ativado" or "desativado"))
+    end)
+    
+    targetBackToggle.MouseButton1Click:Connect(function()
+        _G.AutoTargetBack = not _G.AutoTargetBack
+        targetBackToggle.Text = "Auto Target Back: " .. (_G.AutoTargetBack and "ON" or "OFF")
+        targetBackToggle.BackgroundColor3 = _G.AutoTargetBack and Color3.fromRGB(150, 50, 150) or Color3.fromRGB(100, 100, 100)
+        showNotification("Auto Target Back " .. (_G.AutoTargetBack and "ativado" or "desativado"))
+    end)
+    
+    antiCommandsToggle.MouseButton1Click:Connect(function()
+        _G.AntiCommands = not _G.AntiCommands
+        antiCommandsToggle.Text = "Anti-Commands: " .. (_G.AntiCommands and "ON" or "OFF")
+        antiCommandsToggle.BackgroundColor3 = _G.AntiCommands and Color3.fromRGB(200, 50, 50) or Color3.fromRGB(100, 100, 100)
+        showNotification("Anti-Commands " .. (_G.AntiCommands and "ativado" or "desativado"))
+    end)
+    
+    itemResetToggle.MouseButton1Click:Connect(function()
+        _G.AutoResetItems = not _G.AutoResetItems
+        itemResetToggle.Text = "Auto Reset Items: " .. (_G.AutoResetItems and "ON" or "OFF")
+        itemResetToggle.BackgroundColor3 = _G.AutoResetItems and Color3.fromRGB(180, 100, 50) or Color3.fromRGB(100, 100, 100)
+        showNotification("Auto Reset Items " .. (_G.AutoResetItems and "ativado" or "desativado"))
+    end)
     
     -- Botão de minimizar/maximizar
     local toggleButton = Instance.new("TextButton")
@@ -332,7 +560,6 @@ local function createGUI()
     
     toggleButton.MouseButton1Click:Connect(function()
         isMinimized = not isMinimized
-        
         local targetPos = isMinimized and UDim2.new(1, 20, 0, 20) or UDim2.new(0, 20, 0, 20)
         local targetText = isMinimized and "▶" or "◀"
         
@@ -370,17 +597,85 @@ local function createGUI()
     
     -- Ajustar para mobile
     if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-        mainFrame.Size = UDim2.new(0, 320, 0, 540)
+        mainFrame.Size = UDim2.new(0, 340, 0, 520)
         
-        for _, button in pairs(scrollFrame:GetChildren()) do
-            if button:IsA("TextButton") then
-                button.Size = UDim2.new(1, -10, 0, 70)
+        -- Ajustar ScrollingFrame para mobile
+        scrollFrame.ScrollBarThickness = 12
+        
+        -- Aumentar tamanho dos botões para mobile
+        local function adjustButtonsForMobile()
+            for _, button in pairs(scrollFrame:GetChildren()) do
+                if button:IsA("TextButton") then
+                    button.Size = UDim2.new(1, -10, 0, 60)
+                end
             end
+            
+            local commands = commandCategories[currentTab] or {}
+            scrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#commands * 68) + 10)
         end
         
-        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, (#commands * 78) + 10)
+        -- Conectar ajuste quando atualizar comandos
+        spawn(function()
+            while _G.AdminScriptActive do
+                wait(1)
+                adjustButtonsForMobile()
+            end
+        end)
     end
-end
+    
+    -- Carregar comandos iniciais
+    updateCommands()
+    
+    -- Conectar monitoramento de novos jogadores
+    Players.PlayerAdded:Connect(function(newPlayer)
+        wait(2)
+        newPlayer.Chatted:Connect(function(message)
+            local lowerMessage = message:lower()
+            
+            if not _G.AdminScriptActive then return end
+            
+            -- Verificar se mencionou o nome do player
+            if string.find(lowerMessage, player.Name:lower()) then
+                
+                -- Procurar por comandos em todas as categorias
+                for categoryName, commands in pairs(commandCategories) do
+                    for _, cmd in pairs(commands) do
+                        local cmdLower = cmd.cmd:lower()
+                        
+                        if string.find(lowerMessage, cmdLower) then
+                            wait(1)
+                            
+                            -- Anti-Commands
+                            if _G.AntiCommands then
+                                local reverseCmd = commandReverses[cmd.cmd]
+                                if reverseCmd then
+                                    executeHDCommand(reverseCmd, player.Name)
+                                    showNotification("Anti-Command: " .. reverseCmd)
+                                end
+                            end
+                            
+                            -- Auto Target Back
+                            if _G.AutoTargetBack then
+                                executeHDCommand(cmd.cmd, newPlayer.Name)
+                                showNotification("Target Back: " .. newPlayer.Name)
+                            end
+                            
+                            -- Auto Revenge
+                            if _G.AutoRevenge then
+                                executeHDCommand(cmd.cmd, newPlayer.Name)
+                                showNotification("Revenge: " .. newPlayer.Name)
+                            end
+                            
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+    end)
+
+end -- Fim da função createGUI
+-- PARTE 6 - Sistema de Notificações e Inicialização
 
 -- Função de notificação
 function showNotification(message)
@@ -392,211 +687,188 @@ function showNotification(message)
     local notifFrame = Instance.new("Frame")
     notifFrame.Name = "Notification"
     notifFrame.Parent = screenGui
-    notifFrame.Size = UDim2.new(0, 280, 0, 50)
-    notifFrame.Position = UDim2.new(0.5, -140, 0, -60)
+    notifFrame.Size = UDim2.new(0, 300, 0, 60)
+    notifFrame.Position = UDim2.new(0.5, -150, 0, -70)
     notifFrame.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
     notifFrame.BorderSizePixel = 0
     
     local notifCorner = Instance.new("UICorner")
-    notifCorner.CornerRadius = UDim.new(0, 8)
+    notifCorner.CornerRadius = UDim.new(0, 10)
     notifCorner.Parent = notifFrame
     
     local notifLabel = Instance.new("TextLabel")
     notifLabel.Parent = notifFrame
-    notifLabel.Size = UDim2.new(1, -10, 1, 0)
-    notifLabel.Position = UDim2.new(0, 5, 0, 0)
+    notifLabel.Size = UDim2.new(1, -20, 1, -10)
+    notifLabel.Position = UDim2.new(0, 10, 0, 5)
     notifLabel.BackgroundTransparency = 1
     notifLabel.Text = message
     notifLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     notifLabel.TextScaled = true
-    notifLabel.Font = Enum.Font.Gotham
+    notifLabel.Font = Enum.Font.GothamBold
+    notifLabel.TextWrapped = true
+    
+    -- Sombra da notificação
+    local shadow = Instance.new("Frame")
+    shadow.Name = "Shadow"
+    shadow.Parent = screenGui
+    shadow.Size = UDim2.new(0, 306, 0, 66)
+    shadow.Position = UDim2.new(0.5, -153, 0, -67)
+    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    shadow.BackgroundTransparency = 0.7
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = notifFrame.ZIndex - 1
+    
+    local shadowCorner = Instance.new("UICorner")
+    shadowCorner.CornerRadius = UDim.new(0, 10)
+    shadowCorner.Parent = shadow
     
     -- Animação da notificação
     local tweenIn = TweenService:Create(
         notifFrame,
-        TweenInfo.new(0.3, Enum.EasingStyle.Back),
-        {Position = UDim2.new(0.5, -140, 0, 20)}
+        TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.5, -150, 0, 30)}
+    )
+    
+    local tweenShadowIn = TweenService:Create(
+        shadow,
+        TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.5, -153, 0, 27)}
     )
     
     local tweenOut = TweenService:Create(
         notifFrame,
-        TweenInfo.new(0.3, Enum.EasingStyle.Quad),
-        {Position = UDim2.new(0.5, -140, 0, -60)}
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {
+            Position = UDim2.new(0.5, -150, 0, -70),
+            BackgroundTransparency = 1
+        }
+    )
+    
+    local tweenShadowOut = TweenService:Create(
+        shadow,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {
+            Position = UDim2.new(0.5, -153, 0, -67),
+            BackgroundTransparency = 1
+        }
+    )
+    
+    local tweenTextOut = TweenService:Create(
+        notifLabel,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {TextTransparency = 1}
     )
     
     tweenIn:Play()
+    tweenShadowIn:Play()
     
-    -- Remover notificação após 2.5 segundos
+    -- Remover notificação após 3 segundos
     spawn(function()
-        wait(2.5)
+        wait(3)
         tweenOut:Play()
+        tweenShadowOut:Play()
+        tweenTextOut:Play()
+        
         tweenOut.Completed:Connect(function()
             notifFrame:Destroy()
+            shadow:Destroy()
         end)
     end)
-end
-
--- Monitorar chat para detectar comandos usados em você
-local function monitorChat()
-    player.Chatted:Connect(function(message)
-        -- Registrar comandos que você usa para evitar auto-revidar
-        for _, cmd in pairs(commands) do
-            if string.find(message:lower(), cmd.cmd:lower()) then
-                lastCommands[player.Name] = {
-                    command = cmd.cmd,
-                    time = tick()
-                }
-                break
-            end
-        end
-    end)
-    
-    -- Monitorar outros jogadores
-    for _, otherPlayer in pairs(Players:GetPlayers()) do
-        if otherPlayer ~= player then
-            otherPlayer.Chatted:Connect(function(message)
-                if not _G.AutoRevenge then return end
-                
-                -- Verificar se o comando foi usado em você
-                if string.find(message:lower(), player.Name:lower()) then
-                    for _, cmd in pairs(commands) do
-                        if string.find(message:lower(), cmd.cmd:lower()) then
-                            -- Aguardar antes de revidar
-                            wait(1.5)
-                            
-                            -- Revidar
-                            executeHDCommand(cmd.cmd, otherPlayer.Name)
-                            showNotification("Revidando " .. otherPlayer.Name .. " com " .. cmd.cmd)
-                            break
-                        end
-                    end
-                end
-            end)
-        end
-    end
 end
 
 -- Função para manter o script após respawn
 local function setupPersistence()
     player.CharacterAdded:Connect(function()
         if _G.AdminScriptActive then
-            wait(2) -- Aguardar o character carregar
+            wait(3) -- Aguardar o character carregar completamente
             createGUI()
-            monitorChat()
             showNotification("Script recarregado após respawn!")
         end
     end)
 end
 
--- Função para monitorar backpacks e usar reset automaticamente
-local function monitorBackpacks()
+-- Sistema de monitoramento avançado adicional
+local function advancedMonitoring()
     spawn(function()
         while _G.AdminScriptActive do
-            wait(2) -- Verificar a cada 2 segundos
+            wait(1)
             
-            if not _G.AutoResetItems then
-                wait(1)
+            -- Verificar se o HD Admin ainda está presente
+            if not ReplicatedStorage:FindFirstChild("HDAdminClient") then
+                showNotification("⚠️ HD Admin não detectado!")
+                wait(10)
                 continue
             end
             
-            for _, targetPlayer in pairs(Players:GetPlayers()) do
-                if targetPlayer ~= player and targetPlayer.Character then
-                    local backpack = targetPlayer:FindFirstChild("Backpack")
-                    local character = targetPlayer.Character
-                    
-                    -- Verificar backpack
-                    local hasBackpackItems = false
-                    if backpack then
-                        for _, item in pairs(backpack:GetChildren()) do
-                            if item:IsA("Tool") or item:IsA("HopperBin") then
-                                hasBackpackItems = true
-                                break
-                            end
-                        end
-                    end
-                    
-                    -- Verificar se está segurando algum tool
-                    local hasEquippedTool = false
-                    if character:FindFirstChild("Humanoid") then
-                        local humanoid = character.Humanoid
-                        for _, item in pairs(character:GetChildren()) do
-                            if item:IsA("Tool") then
-                                hasEquippedTool = true
-                                break
-                            end
-                        end
-                    end
-                    
-                    -- Se tem items no backpack ou equipado, usar reset
-                    if hasBackpackItems or hasEquippedTool then
-                        executeHDCommand(":reset", targetPlayer.Name)
-                        showNotification("Auto Reset: " .. targetPlayer.Name .. " (tinha items)")
-                        wait(1) -- Aguardar antes de verificar novamente
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- Sistema de monitoramento avançado de comandos
-local function advancedCommandMonitor()
-    spawn(function()
-        while _G.AdminScriptActive do
-            wait(0.5)
-            
+            -- Monitorar saúde do player para detectar ataques
             if player.Character and player.Character:FindFirstChild("Humanoid") then
                 local humanoid = player.Character.Humanoid
                 
-                -- Detectar se você morreu por comando
-                if humanoid.Health <= 0 then
-                    wait(1)
-                    -- Verificar logs recentes para ver quem matou
-                    -- (Este seria expandido com logs específicos do HD Admin)
+                -- Se a saúde está baixa, pode ter sido atacado
+                if humanoid.Health < 50 and humanoid.Health > 0 then
+                    -- Curar automaticamente se disponível
+                    if _G.AutoRevenge then
+                        executeHDCommand(":heal", player.Name)
+                        showNotification("Auto-cura ativada!")
+                    end
                 end
-                
-                -- Detectar outros efeitos de comandos
-                -- (Freeze, speed changes, etc.)
             end
         end
     end)
 end
 
--- Inicializar tudo
+-- Função principal de inicialização
 local function initialize()
-    createGUI()
-    monitorChat()
-    monitorBackpacks() -- Adicionar monitoramento de backpacks
-    setupPersistence()
-    advancedCommandMonitor()
+    -- Verificar se HD Admin está presente
+    if not ReplicatedStorage:FindFirstChild("HDAdminClient") then
+        StarterGui:SetCore("ChatMakeSystemMessage", {
+            Text = "⚠️ HD Admin não foi detectado! Script pode não funcionar corretamente.";
+            Color = Color3.fromRGB(255, 100, 100);
+            Font = Enum.Font.GothamBold;
+            FontSize = Enum.FontSize.Size18;
+        })
+        wait(2)
+    end
     
-    -- Conectar novos jogadores ao monitoramento
-    Players.PlayerAdded:Connect(function(newPlayer)
-        wait(1)
-        newPlayer.Chatted:Connect(function(message)
-            if not _G.AutoRevenge then return end
-            
-            if string.find(message:lower(), player.Name:lower()) then
-                for _, cmd in pairs(commands) do
-                    if string.find(message:lower(), cmd.cmd:lower()) then
-                        wait(1.5)
-                        executeHDCommand(cmd.cmd, newPlayer.Name)
-                        showNotification("Revidando " .. newPlayer.Name .. " com " .. cmd.cmd)
-                        break
-                    end
-                end
-            end
-        end)
-    end)
+    -- Inicializar todos os sistemas
+    createGUI()
+    monitorCommandsAdvanced()
+    monitorBackpacks()
+    setupPersistence()
+    advancedMonitoring()
+    
+    -- Mostrar mensagem de sucesso
+    wait(1)
+    showNotification("✅ Admin Mobile Pro carregado!")
+    
+    print("===========================================")
+    print("Script Admin Mobile Pro carregado com sucesso!")
+    print("===========================================")
+    print("Recursos:")
+    print("✓ Comandos Admin e Combat")
+    print("✓ Auto Revenge - Revida automaticamente")
+    print("✓ Auto Target Back - Usa mesmo comando no atacante") 
+    print("✓ Anti-Commands - Usa comando reverso para se defender")
+    print("✓ Auto Reset Items - Remove items dos players")
+    print("✓ Interface otimizada para mobile")
+    print("✓ Mantém funcionando após morrer")
+    print("✓ Sistema de notificações melhorado")
+    print("===========================================")
 end
 
 -- Iniciar o script
 initialize()
 
-print("Script Admin Mobile carregado com sucesso!")
-print("Recursos:")
-print("- Comandos enviados pelo chat")
-print("- Auto revidar quando usarem comandos em você") 
-print("- Auto reset em players com items no backpack")
-print("- Mantém funcionando após morrer")
-print("- Interface otimizada para mobile")
+-- Adicionar proteção contra erros
+spawn(function()
+    while _G.AdminScriptActive do
+        wait(30)
+        
+        -- Verificar se a GUI ainda existe
+        if not player.PlayerGui:FindFirstChild("AdminCommandsGUI") and _G.AdminScriptActive then
+            showNotification("🔄 Recarregando GUI...")
+            wait(1)
+            createGUI()
+        end
+    end
+end)
