@@ -1,4 +1,4 @@
--- Rayfield Admin Script with Backpack Monitor
+-- Rayfield Admin Script with Fixed Callbacks
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -23,18 +23,23 @@ local monitoringChat = false
 local monitoringBackpack = false
 local targetPlayer = nil
 local monitoredPlayers = {}
+local selectedAdminCommand = "ban (player name)"
+local selectedCombatCommand = "explode (player name)"
 
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
+local RunService = game:GetService("RunService")
 
 -- Function to execute commands
 local function executeCommand(command)
-    local args = {
-        [1] = command
-    }
-    ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+    pcall(function()
+        local args = {
+            [1] = command
+        }
+        ReplicatedStorage.HDAdminClient.Signals.RequestCommand:InvokeServer(unpack(args))
+    end)
 end
 
 -- Function to execute command on all players
@@ -48,194 +53,144 @@ local function executeCommandOnAll(baseCommand)
 end
 
 -- Chat monitoring system
+local chatConnection = nil
 local function setupChatMonitoring()
+    if chatConnection then
+        chatConnection:Disconnect()
+    end
+    
     local function onMessageAdded(message)
-        if not monitoringChat then return end
-        
-        local textSource = message.TextSource
-        if textSource and textSource.UserId then
-            local player = Players:GetPlayerByUserId(textSource.UserId)
-            if player and message.Text then
-                -- Detect :cmdbar2 command
-                if message.Text:match("^:cmdbar2") then
-                    targetPlayer = player
-                    executeCommand("uncmdbar2 " .. player.Name)
-                    print("Command :uncmdbar2 executed on: " .. player.Name)
+        pcall(function()
+            if not monitoringChat then return end
+            
+            local textSource = message.TextSource
+            if textSource and textSource.UserId then
+                local player = Players:GetPlayerByUserId(textSource.UserId)
+                if player and message.Text then
+                    -- Detect :cmdbar2 command
+                    if string.find(message.Text, ":cmdbar2") then
+                        targetPlayer = player
+                        executeCommand("uncmdbar2 " .. player.Name)
+                        print("Command :uncmdbar2 executed on: " .. player.Name)
+                    end
+                end
+            end
+        end)
+    end
+
+    -- Connect to chat safely
+    pcall(function()
+        if TextChatService.ChatInputBarConfiguration.TargetTextChannel then
+            chatConnection = TextChatService.ChatInputBarConfiguration.TargetTextChannel.MessageAdded:Connect(onMessageAdded)
+        else
+            -- Fallback for older chat systems
+            for _, channel in pairs(TextChatService:GetChildren()) do
+                if channel:IsA("TextChannel") then
+                    chatConnection = channel.MessageAdded:Connect(onMessageAdded)
+                    break
                 end
             end
         end
-    end
-
-    -- Connect to chat
-    if TextChatService.ChatInputBarConfiguration.TargetTextChannel then
-        TextChatService.ChatInputBarConfiguration.TargetTextChannel.MessageAdded:Connect(onMessageAdded)
-    else
-        -- Fallback for older chat systems
-        for _, channel in pairs(TextChatService:GetChildren()) do
-            if channel:IsA("TextChannel") then
-                channel.MessageAdded:Connect(onMessageAdded)
-            end
-        end
-    end
+    end)
 end
 
 -- Backpack monitoring system
+local backpackConnections = {}
 local function setupBackpackMonitoring()
+    -- Clean up existing connections
+    for _, connection in pairs(backpackConnections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    backpackConnections = {}
+    
     local function monitorPlayerBackpack(player)
-        if monitoredPlayers[player] then return end
+        if not player or player == Players.LocalPlayer then return end
         
-        local function checkBackpack()
-            if not monitoringBackpack then return end
-            
-            local backpack = player:FindFirstChild("Backpack")
-            if backpack then
-                -- Check for tools/items in backpack
-                for _, item in pairs(backpack:GetChildren()) do
-                    if item:IsA("Tool") or item:IsA("HopperBin") then
-                        executeCommand("reset " .. player.Name)
-                        Rayfield:Notify({
-                            Title = "Backpack Monitor",
-                            Content = "Reset executed on " .. player.Name .. " (Tool detected: " .. item.Name .. ")",
-                            Duration = 3,
-                            Image = 4483362458
-                        })
-                        wait(1) -- Prevent spam
-                        break
+        pcall(function()
+            local function checkBackpack()
+                if not monitoringBackpack then return end
+                
+                pcall(function()
+                    -- Check backpack
+                    local backpack = player:FindFirstChild("Backpack")
+                    if backpack then
+                        for _, item in pairs(backpack:GetChildren()) do
+                            if item:IsA("Tool") or item:IsA("HopperBin") then
+                                executeCommand("reset " .. player.Name)
+                                Rayfield:Notify({
+                                    Title = "Backpack Monitor",
+                                    Content = "Reset executed on " .. player.Name .. " (Tool: " .. item.Name .. ")",
+                                    Duration = 3,
+                                    Image = 4483362458
+                                })
+                                wait(0.5)
+                                return
+                            end
+                        end
                     end
-                end
+                    
+                    -- Check character for equipped tools
+                    local character = player.Character
+                    if character then
+                        for _, item in pairs(character:GetChildren()) do
+                            if item:IsA("Tool") then
+                                executeCommand("reset " .. player.Name)
+                                Rayfield:Notify({
+                                    Title = "Backpack Monitor",
+                                    Content = "Reset executed on " .. player.Name .. " (Equipped: " .. item.Name .. ")",
+                                    Duration = 3,
+                                    Image = 4483362458
+                                })
+                                wait(0.5)
+                                return
+                            end
+                        end
+                    end
+                end)
             end
             
-            -- Check character for tools
-            local character = player.Character
-            if character then
-                for _, item in pairs(character:GetChildren()) do
-                    if item:IsA("Tool") then
-                        executeCommand("reset " .. player.Name)
-                        Rayfield:Notify({
-                            Title = "Backpack Monitor",
-                            Content = "Reset executed on " .. player.Name .. " (Tool equipped: " .. item.Name .. ")",
-                            Duration = 3,
-                            Image = 4483362458
-                        })
-                        wait(1) -- Prevent spam
-                        break
-                    end
-                end
+            -- Connect to backpack changes
+            if player:FindFirstChild("Backpack") then
+                table.insert(backpackConnections, player.Backpack.ChildAdded:Connect(checkBackpack))
             end
-        end
-        
-        -- Monitor backpack changes
-        monitoredPlayers[player] = player.ChildAdded:Connect(checkBackpack)
-        
-        -- Monitor when player gets a backpack
-        if player:FindFirstChild("Backpack") then
-            player.Backpack.ChildAdded:Connect(checkBackpack)
-        else
-            player.ChildAdded:Connect(function(child)
+            
+            -- Connect to new backpack creation
+            table.insert(backpackConnections, player.ChildAdded:Connect(function(child)
                 if child.Name == "Backpack" then
-                    child.ChildAdded:Connect(checkBackpack)
+                    table.insert(backpackConnections, child.ChildAdded:Connect(checkBackpack))
                 end
-            end)
-        end
-        
-        -- Monitor character changes
-        player.CharacterAdded:Connect(function(character)
-            character.ChildAdded:Connect(checkBackpack)
+            end))
+            
+            -- Connect to character changes
+            table.insert(backpackConnections, player.CharacterAdded:Connect(function(character)
+                table.insert(backpackConnections, character.ChildAdded:Connect(checkBackpack))
+            end))
+            
+            if player.Character then
+                table.insert(backpackConnections, player.Character.ChildAdded:Connect(checkBackpack))
+            end
         end)
-        
-        if player.Character then
-            player.Character.ChildAdded:Connect(checkBackpack)
-        end
     end
     
     -- Monitor all current players
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= Players.LocalPlayer then
-            monitorPlayerBackpack(player)
-        end
+        monitorPlayerBackpack(player)
     end
     
     -- Monitor new players
-    Players.PlayerAdded:Connect(function(player)
-        if monitoringBackpack then
-            monitorPlayerBackpack(player)
-        end
-    end)
-    
-    -- Clean up when players leave
-    Players.PlayerRemoving:Connect(function(player)
-        if monitoredPlayers[player] then
-            monitoredPlayers[player]:Disconnect()
-            monitoredPlayers[player] = nil
-        end
-    end)
+    table.insert(backpackConnections, Players.PlayerAdded:Connect(monitorPlayerBackpack))
 end
 
--- Admin Commands
-local adminCommands = {
-    "ban (player name)",
-    "kick (player name)",
-    "mute (player name)",
-    "unmute (player name)",
-    "tp (player name)",
-    "bring (player name)",
-    "freeze (player name)",
-    "unfreeze (player name)",
-    "invisible (player name)",
-    "visible (player name)",
-    "god (player name)",
-    "ungod (player name)",
-    "heal (player name)",
-    "kill (player name)",
-    "respawn (player name)",
-    "jail (player name)",
-    "unjail (player name)",
-    "blind (player name)",
-    "unblind (player name)",
-    "punish (player name)",
-    "unpunish (player name)",
-    "walkspeed (player name) 16",
-    "jumppower (player name) 50",
-    "size (player name) 1"
-}
-
--- Combat Commands
-local combatCommands = {
-    "explode (player name)",
-    "damage (player name)",
-    "fire (player name)",
-    "unfire (player name)",
-    "poison (player name)",
-    "unpoison (player name)",
-    "stun (player name)",
-    "unstun (player name)",
-    "ragdoll (player name)",
-    "unragdoll (player name)",
-    "fling (player name)",
-    "trip (player name)",
-    "push (player name)",
-    "pull (player name)",
-    "freeze (player name)",
-    "unfreeze (player name)",
-    "blind (player name)",
-    "flash (player name)",
-    "confusion (player name)",
-    "shake (player name)",
-    "meteor (player name)",
-    "lightning (player name)",
-    "crush (player name)"
-}
-
--- Create tabs
+-- Create tabs content
 local MainTab = Window:CreateTab("Main", 4483362458)
 local AdminTab = Window:CreateTab("Admin", 4483362458)
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 
 -- Main Tab
-local chatSection = MainTab:CreateSection("Chat Monitoring")
+local chatSection = MainTab:CreateSection("Monitoring Systems")
 
 local chatToggle = MainTab:CreateToggle({
-   Name = "Monitor Chat (:cmdbar2)",
+   Name = "Monitor Chat (:cmdbar2 Detection)",
    CurrentValue = false,
    Flag = "ChatMonitor",
    Callback = function(Value)
@@ -244,11 +199,14 @@ local chatToggle = MainTab:CreateToggle({
          setupChatMonitoring()
          Rayfield:Notify({
             Title = "Chat Monitor",
-            Content = "Chat monitoring activated! Detecting :cmdbar2",
+            Content = "Chat monitoring activated!",
             Duration = 3,
             Image = 4483362458
          })
       else
+         if chatConnection then
+            chatConnection:Disconnect()
+         end
          Rayfield:Notify({
             Title = "Chat Monitor",
             Content = "Chat monitoring disabled",
@@ -259,10 +217,8 @@ local chatToggle = MainTab:CreateToggle({
    end,
 })
 
-local backpackSection = MainTab:CreateSection("Backpack Monitoring")
-
 local backpackToggle = MainTab:CreateToggle({
-   Name = "Monitor Backpack (Auto Reset)",
+   Name = "Monitor Backpack (Auto Reset on Tools)",
    CurrentValue = false,
    Flag = "BackpackMonitor",
    Callback = function(Value)
@@ -271,18 +227,15 @@ local backpackToggle = MainTab:CreateToggle({
          setupBackpackMonitoring()
          Rayfield:Notify({
             Title = "Backpack Monitor",
-            Content = "Backpack monitoring activated! Auto-reset on tool detection",
+            Content = "Backpack monitoring activated!",
             Duration = 3,
             Image = 4483362458
          })
       else
-         -- Disconnect all monitoring connections
-         for player, connection in pairs(monitoredPlayers) do
-            if connection then
-                connection:Disconnect()
-            end
+         for _, connection in pairs(backpackConnections) do
+            pcall(function() connection:Disconnect() end)
          end
-         monitoredPlayers = {}
+         backpackConnections = {}
          Rayfield:Notify({
             Title = "Backpack Monitor",
             Content = "Backpack monitoring disabled",
@@ -296,7 +249,6 @@ local backpackToggle = MainTab:CreateToggle({
 -- Admin Tab
 local adminSection = AdminTab:CreateSection("Admin Commands")
 
-local selectedAdminCommand = adminCommands[1]
 local adminDropdown = AdminTab:CreateDropdown({
    Name = "Select Admin Command",
    Options = adminCommands,
@@ -312,8 +264,8 @@ local adminExecuteButton = AdminTab:CreateButton({
    Callback = function()
       executeCommandOnAll(selectedAdminCommand)
       Rayfield:Notify({
-         Title = "Command Executed",
-         Content = "Admin command executed on all: " .. selectedAdminCommand,
+         Title = "Admin Command",
+         Content = "Executed: " .. selectedAdminCommand,
          Duration = 3,
          Image = 4483362458
       })
@@ -323,7 +275,6 @@ local adminExecuteButton = AdminTab:CreateButton({
 -- Combat Tab
 local combatSection = CombatTab:CreateSection("Combat Commands")
 
-local selectedCombatCommand = combatCommands[1]
 local combatDropdown = CombatTab:CreateDropdown({
    Name = "Select Combat Command",
    Options = combatCommands,
@@ -339,8 +290,8 @@ local combatExecuteButton = CombatTab:CreateButton({
    Callback = function()
       executeCommandOnAll(selectedCombatCommand)
       Rayfield:Notify({
-         Title = "Command Executed",
-         Content = "Combat command executed on all: " .. selectedCombatCommand,
+         Title = "Combat Command",
+         Content = "Executed: " .. selectedCombatCommand,
          Duration = 3,
          Image = 4483362458
       })
@@ -348,27 +299,27 @@ local combatExecuteButton = CombatTab:CreateButton({
 })
 
 -- Manual command section
-local manualSection = MainTab:CreateSection("Manual Command")
+local manualSection = MainTab:CreateSection("Manual Commands")
 
+local manualCommand = ""
 local manualInput = MainTab:CreateInput({
    Name = "Custom Command",
-   PlaceholderText = "Type command...",
+   PlaceholderText = "Type your command here...",
    RemoveTextAfterFocusLost = false,
    Flag = "ManualCommand",
    Callback = function(Text)
-      -- Callback called when text changes
+      manualCommand = Text
    end,
 })
 
 local manualExecuteButton = MainTab:CreateButton({
    Name = "Execute Manual Command",
    Callback = function()
-      local command = Rayfield.Flags["ManualCommand"].CurrentValue
-      if command and command ~= "" then
-         executeCommand(command)
+      if manualCommand and manualCommand ~= "" then
+         executeCommand(manualCommand)
          Rayfield:Notify({
             Title = "Manual Command",
-            Content = "Command executed: " .. command,
+            Content = "Executed: " .. manualCommand,
             Duration = 3,
             Image = 4483362458
          })
@@ -383,15 +334,15 @@ local manualExecuteButton = MainTab:CreateButton({
    end,
 })
 
--- Information
-local infoSection = MainTab:CreateSection("Information")
+-- Information section
+local infoSection = MainTab:CreateSection("Instructions")
 
 MainTab:CreateParagraph({
-   Title = "How to use:",
-   Content = "1. Enable chat monitoring to auto-detect :cmdbar2\n2. Enable backpack monitoring to auto-reset players with tools\n3. Use dropdowns to select commands\n4. Click 'Execute on All' to apply selected command to all players\n5. Use manual command for custom commands"
+   Title = "Features:",
+   Content = "• Chat Monitor: Auto-detects :cmdbar2 and executes :uncmdbar2\n• Backpack Monitor: Auto-resets players when tools are detected\n• Mass Commands: Execute admin/combat commands on all players\n• Manual Commands: Execute custom commands"
 })
 
--- Finish
+-- Success notification
 Rayfield:Notify({
    Title = "Admin Panel",
    Content = "Script loaded successfully!",
@@ -399,7 +350,9 @@ Rayfield:Notify({
    Image = 4483362458
 })
 
-print("Rayfield Admin Script loaded!")
-print("Chat monitoring: Use toggle to activate")
-print("Backpack monitoring: Use toggle to auto-reset players with tools")
-print("Commands available in Admin and Combat tabs")
+print("=== Rayfield Admin Script Loaded ===")
+print("✓ Chat monitoring available")
+print("✓ Backpack monitoring available") 
+print("✓ Admin commands ready")
+print("✓ Combat commands ready")
+print("✓ Manual commands ready")
